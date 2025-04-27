@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: shatool-dad-monitor
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: API_TOKEN
+        sync: false
+        description: Your API token for webhook authentication
+      - key: PORT
+        value: 3000
+        description: Port for the web interface 

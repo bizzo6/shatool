@@ -1,0 +1,31 @@
+{
+  "name": "shatool_dad_monitor",
+  "version": "1.0.0",
+  "description": "Dedicated WhatsApp Web Monitor for Shatool Dad",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "nodemon app.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "whatsapp",
+    "monitor",
+    "webhook"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.8.4",
+    "dotenv": "^16.4.5",
+    "express": "^4.18.3",
+    "qrcode": "^1.5.3",
+    "qrcode-terminal": "^0.12.0",
+    "whatsapp-web.js": "^1.26.0",
+    "yargs": "^17.7.2",
+    "ws": "^8.16.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  }
+}
