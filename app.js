@@ -317,7 +317,7 @@ app.get('/', (req, res) => {
         <!DOCTYPE html>
         <html>
         <head>
-            <title>WhatsApp Web Monitor</title>
+            <title>Shatool Dad Monitor</title>
             <style>
                 body {
                     font-family: Arial, sans-serif;
@@ -486,7 +486,8 @@ app.get('/', (req, res) => {
                 }
 
                 // WebSocket connection for real-time message updates
-                const ws = new WebSocket('ws://' + window.location.host + '/ws');
+                const wsProtocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+                const ws = new WebSocket(wsProtocol + window.location.host + '/ws');
                 
                 ws.onmessage = function(event) {
                     const message = JSON.parse(event.data);
