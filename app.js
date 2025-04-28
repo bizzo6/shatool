@@ -7,6 +7,7 @@ const yargs = require('yargs');
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
+const WebSocket = require('ws');
 
 // Parse command line arguments
 const argv = yargs
@@ -49,10 +50,15 @@ const client = new Client({
 let isClientReady = false;
 let qrData = null;
 let appState = 'starting'; // 'starting', 'waiting_for_qr', 'authenticated'
+let lastApiCallTime = 0;
+const messageStore = [];
 
 // Initialize Express app
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Add JSON body parser middleware
+app.use(express.json());
 
 // Serve static files from public directory
 app.use(express.static('public'));
@@ -197,7 +203,26 @@ function getMessageType(msg) {
     return 'text';
 }
 
-// Listen for new messages
+// Add this before the message event handler
+app.post('/api/getMessages', (req, res) => {
+    const { token } = req.body;
+
+    // Validate token
+    if (!token || token !== global.API_TOKEN) {
+        return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    // Get messages since last call
+    const newMessages = messageStore.filter(msg => msg.timestamp > lastApiCallTime);
+    
+    // Update last call time
+    lastApiCallTime = Date.now() / 1000; // Convert to Unix timestamp
+
+    // Return messages
+    res.json(newMessages);
+});
+
+// Modify the message event handler to store messages
 client.on('message', async msg => {
     if (!isClientReady) {
         console.log('Client not ready yet, ignoring message');
@@ -209,6 +234,49 @@ client.on('message', async msg => {
         const sender = await msg.getContact();
         const messageType = getMessageType(msg);
         const chatType = getChatType(chat.id._serialized);
+
+        // Extract message ID (last part after "us_")
+        const messageId = msg.id._serialized.split('us_')[1] || msg.id._serialized;
+
+        // Extract from_number (digits before the @)
+        const fromNumber = msg.from.split('@')[0];
+
+        // Find links in the message text
+        const linkRegex = /(?:https?:\/\/)?(?:www\.)?[^\s]+\.[^\s]+/g;
+        const links = msg.body ? msg.body.match(linkRegex) || [] : [];
+
+        // Create the message JSON
+        const messageJson = {
+            id: messageId,
+            timestamp: msg.timestamp,
+            group: chatType === 'Group' ? chat.name : "",
+            from: sender.name || sender.number,
+            from_number: fromNumber,
+            type: messageType,
+            forwarded: msg.isForwarded,
+            text: msg.body || "",
+            links: links
+        };
+
+        // Store the message
+        messageStore.push(messageJson);
+
+        // Broadcast message to all connected WebSocket clients
+        wss.clients.forEach(client => {
+            if (client.readyState === WebSocket.OPEN) {
+                client.send(JSON.stringify({
+                    type: 'new_message',
+                    from: sender.name || sender.number,
+                    group: chatType === 'Group' ? chat.name : null,
+                    message: messageJson
+                }));
+            }
+        });
+
+        // Log the formatted JSON
+        console.log('\n=== Message JSON ===');
+        console.log(JSON.stringify(messageJson, null, 2));
+        console.log('==================\n');
 
         // Enhanced message logging with all available metadata
         console.log('\n=== New Message ===');
@@ -392,7 +460,7 @@ app.get('/', (req, res) => {
             </style>
         </head>
         <body>
-            <h1>WhatsApp Web Monitor</h1>
+            <h1>Shatool Dad Monitor</h1>
             <div class="server-status">
                 <div id="status-indicator" class="status-indicator"></div>
                 <div id="status" class="status"></div>
@@ -460,7 +528,7 @@ app.get('/', (req, res) => {
                             }
                             break;
                         case 'authenticated':
-                            statusText = 'WhatsApp client is ready!';
+                            statusText = 'Ready! Dad is now listening...';
                             statusClass = 'ready';
                             qrContainer.innerHTML = '';
                             if (!startTime) {
@@ -510,102 +578,10 @@ app.get('/', (req, res) => {
 });
 
 // Add WebSocket support for real-time updates
-const WebSocket = require('ws');
 const wss = new WebSocket.Server({ noServer: true });
 
 wss.on('connection', function connection(ws) {
     console.log('New WebSocket connection');
-});
-
-// Modify the message event handler to broadcast messages
-client.on('message', async msg => {
-    if (!isClientReady) {
-        console.log('Client not ready yet, ignoring message');
-        return;
-    }
-
-    try {
-        const chat = await msg.getChat();
-        const sender = await msg.getContact();
-        const messageType = getMessageType(msg);
-        const chatType = getChatType(chat.id._serialized);
-
-        // Broadcast message to all connected WebSocket clients
-        wss.clients.forEach(client => {
-            if (client.readyState === WebSocket.OPEN) {
-                client.send(JSON.stringify({
-                    type: 'new_message',
-                    from: sender.name || sender.number,
-                    group: chatType === 'Group' ? chat.name : null
-                }));
-            }
-        });
-
-        // Enhanced message logging with all available metadata
-        console.log('\n=== New Message ===');
-        console.log(`Message ID: ${msg.id._serialized}`);
-        console.log(`Timestamp: ${new Date(msg.timestamp * 1000).toISOString()}`);
-        console.log(`Chat Type: ${chatType}`);
-        console.log(`Chat ID: ${chat.id._serialized}`);
-        console.log(`Chat Name: ${chat.name || 'Unknown'}`);
-        console.log(`From: ${sender.name || sender.number}`);
-        console.log(`From ID: ${msg.from}`);
-        console.log(`To: ${msg.to}`);
-        console.log(`Message Type: ${messageType}`);
-        console.log(`Has Media: ${msg.hasMedia}`);
-        console.log(`Media Type: ${msg.type || 'N/A'}`);
-        console.log(`Is Forwarded: ${msg.isForwarded}`);
-        console.log(`Is Status: ${msg.isStatus}`);
-        console.log(`Is Starred: ${msg.isStarred}`);
-        console.log(`Is From Me: ${msg.fromMe}`);
-        console.log(`Has Quoted Message: ${msg.hasQuotedMsg}`);
-        console.log(`Body Preview: ${msg.body ? msg.body.substring(0, 20) + (msg.body.length > 20 ? '...' : '') : 'N/A'}`);
-        console.log(`VCard: ${msg.vCards.length > 0 ? 'Yes' : 'No'}`);
-        console.log(`Mentions: ${msg.mentionedIds.length > 0 ? msg.mentionedIds.join(', ') : 'None'}`);
-        console.log(`Links: ${msg.links.length > 0 ? msg.links.join(', ') : 'None'}`);
-        console.log('==================\n');
-
-        const targetGroupName = 'בדיקה';
-
-        if (chatType === 'Group' && chat.name === targetGroupName) {
-            const payload = {
-                messageId: msg.id._serialized,
-                timestamp: msg.timestamp,
-                from: msg.from,
-                to: msg.to,
-                body: msg.body,
-                chatId: chat.id._serialized,
-                chatName: chat.name,
-                isGroup: true,
-                apiToken: global.API_TOKEN,
-                messageType: messageType,
-                metadata: {
-                    hasMedia: msg.hasMedia,
-                    mediaType: msg.type,
-                    isForwarded: msg.isForwarded,
-                    isStatus: msg.isStatus,
-                    isStarred: msg.isStarred,
-                    fromMe: msg.fromMe,
-                    hasQuotedMsg: msg.hasQuotedMsg,
-                    vCards: msg.vCards,
-                    mentionedIds: msg.mentionedIds,
-                    links: msg.links
-                }
-            };
-
-            // Trigger the webhook POST request
-            try {
-                //const response = await axios.post('https://your-webhook-url.com', payload);
-                console.log(payload.body);
-                //console.log('Webhook triggered successfully:', response.status);
-            } catch (error) {
-                console.error('Error triggering webhook:', error);
-            }
-        }
-    } catch (err) {
-        console.error('Error processing message:', err);
-        console.error('Error details:', err.stack);
-    }
 });
 
 // Add WebSocket upgrade handler to the HTTP server
@@ -620,6 +596,20 @@ server.on('upgrade', (request, socket, head) => {
 });
 
 // Initialize the WhatsApp client
+console.log('\n=== Server Startup Information ===');
+console.log(`API Token: ${global.API_TOKEN ? 'Set' : 'Not set'}`);
+if (global.API_TOKEN) {
+    console.log(`Token value: ${global.API_TOKEN.substring(0, 4)}...${global.API_TOKEN.substring(global.API_TOKEN.length - 4)}`);
+}
+
+// Check if authentication data exists
+const authPath = path.join(__dirname, '.wwebjs_auth');
+if (fs.existsSync(authPath)) {
+    console.log('Authentication: Found existing authentication data');
+} else {
+    console.log('Authentication: No existing authentication data found - will require new QR scan');
+}
+
 console.log('Initializing WhatsApp client...');
 client.initialize().catch(err => {
     console.error('Failed to initialize client:', err);
