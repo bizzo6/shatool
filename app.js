@@ -205,10 +205,20 @@ function getMessageType(msg) {
 
 // Add this before the message event handler
 app.post('/api/getMessages', (req, res) => {
+    const timestamp = new Date().toISOString();
+    console.log(`\n=== API Request [${timestamp}] ===`);
+    console.log('Request Body:', JSON.stringify(req.body, null, 2));
+
     const { token } = req.body;
 
     // Validate token
-    if (!token || token !== global.API_TOKEN) {
+    if (!token) {
+        console.log('Error: No token provided');
+        return res.status(401).json({ error: 'Token is required' });
+    }
+
+    if (token !== global.API_TOKEN) {
+        console.log('Error: Invalid token provided');
         return res.status(401).json({ error: 'Invalid token' });
     }
 
@@ -217,6 +227,10 @@ app.post('/api/getMessages', (req, res) => {
     
     // Update last call time
     lastApiCallTime = Date.now() / 1000; // Convert to Unix timestamp
+
+    console.log(`Response: Sending ${newMessages.length} messages`);
+    console.log('Messages:', JSON.stringify(newMessages, null, 2));
+    console.log('==================\n');
 
     // Return messages
     res.json(newMessages);
