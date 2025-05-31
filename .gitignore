@@ -33,6 +33,8 @@ coverage/
 *.tmp
 *.temp 
 notes.txt
+ai_processor/__pycache__/
+ai_processor/tests/__pycache__/
 
 # Data
 data/todo
