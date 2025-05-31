@@ -32,3 +32,10 @@ coverage/
 # Temporary files
 *.tmp
 *.temp 
+notes.txt
+
+# Data
+data/todo
+data/calendar
+data/general
+active_chats.json
