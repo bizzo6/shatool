@@ -1,0 +1,77 @@
+{
+    "name": "prompt_keywords",
+    "description": "תיעוד מילות מפתח מיוחדות המשמשות בתבניות הפקודות",
+    "keywords": {
+        "metadata": {
+            "description": "גישה למטא-דאטה מקובץ התצורה",
+            "format": "{metadata[key]}",
+            "available_keys": {
+                "relevant_class": "שם הכיתה (למשל, 'כיתה ג'1')",
+                "teacher_names": "רשימת שמות המורים מופרדת בפסיקים",
+                "your_kid_names": "שם הילד",
+                "your_kid_gender": "מגדר הילד",
+                "parents_names": "רשימת שמות ההורים מופרדת בפסיקים",
+                "today": "התאריך הנוכחי בפורמט YYYY-MM-DD"
+            },
+            "example": "{metadata[relevant_class]} -> 'כיתה ג'1'"
+        },
+        "context_items": {
+            "description": "הוספת פריטים פעילים להקשר",
+            "format": "{context_items}",
+            "note": "זה יוחלף אוטומטית בפריטים פעילים מעוצבים מאחסון הנתונים",
+            "example": "פריטים פעילים להקשר:\n{context_items}"
+        },
+        "messages": {
+            "description": "הוספת הודעות וואטסאפ מעוצבות",
+            "format": "{messages}",
+            "note": "זה יוחלף אוטומטית בהודעות מעוצבות כולל חותמות זמן",
+            "example": "הודעות:\n{messages}"
+        }
+    },
+    "output_format": {
+        "description": "סכמת JSON לפורמט הפלט הצפוי",
+        "required_fields": {
+            "type": "חייב להיות 'object'",
+            "properties": "חייב להגדיר את מבנה הפלט",
+            "items": "עבור מערכים, חייב להגדיר את מבנה פריטי המערך"
+        },
+        "common_properties": {
+            "type": "סוג נתונים (string, number, boolean, array, object)",
+            "description": "תיאור השדה",
+            "required": "מערך של שמות שדות חובה",
+            "enum": "מערך של ערכים מותרים (עבור שדות מחרוזת)",
+            "pattern": "ביטוי רגולרי לאימות מחרוזת",
+            "format": "פורמט מיוחד (למשל, date-time)"
+        }
+    },
+    "template_sections": {
+        "description": "סעיפים נפוצים בתבניות הפקודות",
+        "sections": [
+            {
+                "name": "הקשר",
+                "description": "מידע על הכיתה, המורים, הילד וההורים",
+                "example": "שקול את ההקשר הבא:\n- כיתה: {metadata[relevant_class]}\n- מורים: {metadata[teacher_names]}"
+            },
+            {
+                "name": "פריטים פעילים",
+                "description": "רשימת פריטים פעילים נוכחיים להקשר",
+                "example": "פריטים פעילים להקשר:\n{context_items}"
+            },
+            {
+                "name": "נקודות לניתוח",
+                "description": "נקודות לשקול במהלך הניתוח",
+                "example": "שקול את הדברים הבאים בניתוח:\n- תאריכי יעד או מסגרות זמן\n- רמות עדיפות"
+            },
+            {
+                "name": "הודעות",
+                "description": "ההודעות לניתוח",
+                "example": "הודעות:\n{messages}"
+            },
+            {
+                "name": "פורמט פלט",
+                "description": "סכמת JSON לפלט הצפוי",
+                "example": "החזר את התוצאות בפורמט JSON הבא:\n{...}"
+            }
+        ]
+    }
+} 

@@ -1,0 +1,58 @@
+{
+  "name": "calendar",
+  "description": "חילוץ אירועי לוח שנה מהודעות וואטסאפ",
+  "template": "נתח את הודעות הוואטסאפ הבאות מקבוצת הכיתה וחלץ כל אירועי לוח שנה או פגישות שמוזכרות.\n\nשקול את ההקשר הבא:\n- כיתה: {metadata[relevant_class]}\n- מורים: {metadata[teacher_names]}\n- הילד שלך: {metadata[your_kid_names]} ({metadata[your_kid_gender]})\n- הורים: {metadata[parents_names]}\n- תאריך היום: {metadata[today]}\n\nפריטים פעילים להקשר:\n{context_items}\n\nשקול את הדברים הבאים בניתוח:\n- תאריכים ושעות של אירועים\n- משך האירועים\n- מידע על מיקום\n- משתתפים או נוכחים\n- סוג האירוע (בחינה, פגישה, פעילות וכו')\n- האם הילד שלך צריך להשתתף\n- כיצד אירועים חדשים קשורים לאירועים פעילים קיימים\n\nהודעות:\n{messages}\n\nהחזר את התוצאות בפורמט JSON הבא:\n{\n    \"events\": [\n        {\n            \"title\": \"כותרת האירוע\",\n            \"start_time\": \"YYYY-MM-DD HH:MM\",\n            \"end_time\": \"YYYY-MM-DD HH:MM\",\n            \"location\": \"מיקום האירוע או null\",\n            \"description\": \"תיאור האירוע\",\n            \"event_type\": \"exam|meeting|activity|other\",\n            \"requires_child_attendance\": true|false,\n            \"requires_parent_attendance\": true|false,\n            \"source_message\": \"טקסט ההודעה המקורית\"\n        }\n    ]\n}\n",
+  "output_format": {
+    "type": "object",
+    "properties": {
+      "events": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["title", "start_time", "end_time", "description", "event_type", "requires_child_attendance", "requires_parent_attendance", "source_message"],
+          "properties": {
+            "title": {
+              "type": "string",
+              "description": "כותרת האירוע"
+            },
+            "start_time": {
+              "type": "string",
+              "description": "זמן התחלה בפורמט YYYY-MM-DD HH:MM",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}$"
+            },
+            "end_time": {
+              "type": "string",
+              "description": "זמן סיום בפורמט YYYY-MM-DD HH:MM",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}$"
+            },
+            "location": {
+              "type": ["string", "null"],
+              "description": "מיקום האירוע, או null אם לא צוין"
+            },
+            "description": {
+              "type": "string",
+              "description": "תיאור מפורט של האירוע"
+            },
+            "event_type": {
+              "type": "string",
+              "enum": ["מבחן", "פגישה", "פעילות", "אחר"],
+              "description": "סוג האירוע"
+            },
+            "requires_child_attendance": {
+              "type": "boolean",
+              "description": "האם הילד צריך להשתתף"
+            },
+            "requires_parent_attendance": {
+              "type": "boolean",
+              "description": "האם הורה צריך להשתתף"
+            },
+            "source_message": {
+              "type": "string",
+              "description": "טקסט ההודעה המקורית שיצר אירוע זה"
+            }
+          }
+        }
+      }
+    }
+  }
+} 

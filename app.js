@@ -52,6 +52,11 @@ let qrData = null;
 let appState = 'starting'; // 'starting', 'waiting_for_qr', 'authenticated'
 let lastApiCallTime = 0;
 const messageStore = [];
+let activeChatIds = new Set();
+const ACTIVE_CHATS_FILE = path.join(__dirname, 'active_chats.json');
+let cachedChats = null;
+let lastChatsUpdate = null;
+let messageStoreByGroup = new Map(); // Store messages by group ID
 
 // Initialize Express app
 const app = express();
@@ -71,7 +76,21 @@ client.on('qr', (qr) => {
     appState = 'waiting_for_qr';
 });
 
-// Notify when the client is ready
+// Function to wait for client to be fully initialized
+async function waitForClientReady() {
+    return new Promise((resolve) => {
+        const checkReady = () => {
+            if (isClientReady && client.pupPage) {
+                resolve();
+            } else {
+                setTimeout(checkReady, 1000);
+            }
+        };
+        checkReady();
+    });
+}
+
+// Modify the ready event handler
 client.on('ready', async () => {
     console.log('Client is ready!');
     isClientReady = true;
@@ -83,9 +102,13 @@ client.on('ready', async () => {
     
     try {
         console.log('Waiting for client to be fully initialized...');
-        await new Promise(resolve => setTimeout(resolve, 5000));
+        await waitForClientReady();
+        console.log('Client fully initialized, proceeding with setup...');
+        
         await printUserStats();
         await printActiveContactsAndGroups(10);
+        // Cache chats on startup
+        await updateCachedChats();
     } catch (error) {
         console.error('Error in ready handler:', error);
         console.error('Error details:', error.stack);
@@ -203,8 +226,326 @@ function getMessageType(msg) {
     return 'text';
 }
 
-// Add this before the message event handler
-app.post('/api/getMessages', (req, res) => {
+// Function to load active chats from file
+function loadActiveChats() {
+    try {
+        if (fs.existsSync(ACTIVE_CHATS_FILE)) {
+            const data = fs.readFileSync(ACTIVE_CHATS_FILE, 'utf8');
+            const loadedData = JSON.parse(data);
+            
+            // Convert old format to new format if needed
+            if (Array.isArray(loadedData)) {
+                const newData = {
+                    "default": {
+                        "name": "Default Group",
+                        "chatIds": loadedData
+                    }
+                };
+                fs.writeFileSync(ACTIVE_CHATS_FILE, JSON.stringify(newData, null, 2));
+                return newData;
+            }
+            
+            return loadedData;
+        }
+        return {};
+    } catch (error) {
+        console.error('Error loading active chats:', error);
+        return {};
+    }
+}
+
+// Function to save active chats to file
+function saveActiveChats(data) {
+    try {
+        fs.writeFileSync(ACTIVE_CHATS_FILE, JSON.stringify(data, null, 2));
+        console.log('Saved active chats configuration to file');
+    } catch (error) {
+        console.error('Error saving active chats:', error);
+    }
+}
+
+// Function to get messages for a specific group
+function getMessagesForGroup(groupId) {
+    return messageStoreByGroup.get(groupId) || [];
+}
+
+// Function to add message to group store
+function addMessageToGroup(groupId, message) {
+    if (!messageStoreByGroup.has(groupId)) {
+        messageStoreByGroup.set(groupId, []);
+    }
+    messageStoreByGroup.get(groupId).push(message);
+}
+
+// Load active chats on startup
+const activeChatsConfig = loadActiveChats();
+
+// Modify the message event handler to filter messages based on active groups
+client.on('message', async msg => {
+    if (!isClientReady) {
+        console.log('Client not ready yet, ignoring message');
+        return;
+    }
+
+    try {
+        const chat = await msg.getChat();
+        const chatId = chat.id._serialized;
+
+        // Check if this chat belongs to any active group
+        const activeGroups = Object.entries(activeChatsConfig)
+            .filter(([_, config]) => config.chatIds.includes(chatId));
+
+        if (activeGroups.length === 0) {
+            return; // Skip if chat doesn't belong to any active group
+        }
+
+        const sender = await msg.getContact();
+        const messageType = getMessageType(msg);
+        const chatType = getChatType(chatId);
+
+        // Create the message JSON
+        const messageJson = {
+            id: msg.id._serialized.split('us_')[1] || msg.id._serialized,
+            timestamp: msg.timestamp,
+            group: chatType === 'Group' ? chat.name : "",
+            from: sender.name || sender.number,
+            from_number: msg.from.split('@')[0],
+            type: messageType,
+            forwarded: msg.isForwarded,
+            text: msg.body || "",
+            links: msg.body ? msg.body.match(/(?:https?:\/\/)?(?:www\.)?[^\s]+\.[^\s]+/g) || [] : []
+        };
+
+        // Add message to each relevant group's store
+        activeGroups.forEach(([groupId, _]) => {
+            addMessageToGroup(groupId, messageJson);
+        });
+
+        // Broadcast message to all connected WebSocket clients
+        wss.clients.forEach(client => {
+            if (client.readyState === WebSocket.OPEN) {
+                client.send(JSON.stringify({
+                    type: 'new_message',
+                    from: sender.name || sender.number,
+                    group: chatType === 'Group' ? chat.name : null,
+                    message: messageJson
+                }));
+            }
+        });
+
+    } catch (err) {
+        console.error('Error processing message:', err);
+        console.error('Error details:', err.stack);
+    }
+});
+
+// Add new group-based endpoints
+app.post('/api/setActive/:groupId', (req, res) => {
+    const timestamp = new Date().toISOString();
+    console.log(`\n=== API Request [${timestamp}] ===`);
+    console.log('Request Body:', JSON.stringify(req.body, null, 2));
+
+    const { token, chatIds, group_name } = req.body;
+    const groupId = req.params.groupId;
+
+    // Validate token
+    if (!token) {
+        console.log('Error: No token provided');
+        return res.status(401).json({ error: 'Token is required' });
+    }
+
+    if (token !== global.API_TOKEN) {
+        console.log('Error: Invalid token provided');
+        return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    // Validate required fields
+    if (!chatIds || !Array.isArray(chatIds)) {
+        return res.status(400).json({ error: 'chatIds array is required' });
+    }
+
+    if (!group_name) {
+        return res.status(400).json({ error: 'group_name is required' });
+    }
+
+    try {
+        // Update active chats configuration
+        activeChatsConfig[groupId] = {
+            name: group_name,
+            chatIds: chatIds
+        };
+
+        // Save to file
+        saveActiveChats(activeChatsConfig);
+
+        res.json({
+            success: true,
+            message: `Group ${groupId} updated successfully`,
+            group: activeChatsConfig[groupId]
+        });
+    } catch (error) {
+        console.error('Error setting active group:', error);
+        res.status(500).json({ error: 'Failed to set active group' });
+    }
+});
+
+// Modify getActive endpoint to use POST
+app.post('/api/getActive/:groupId', (req, res) => {
+    const timestamp = new Date().toISOString();
+    console.log(`\n=== API Request [${timestamp}] ===`);
+    console.log('Request Body:', JSON.stringify(req.body, null, 2));
+
+    const { token } = req.body;
+    const groupId = req.params.groupId;
+
+    // Validate token
+    if (!token) {
+        console.log('Error: No token provided');
+        return res.status(401).json({ error: 'Token is required' });
+    }
+
+    if (token !== global.API_TOKEN) {
+        console.log('Error: Invalid token provided');
+        return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    try {
+        if (groupId) {
+            // Return specific group
+            const group = activeChatsConfig[groupId];
+            if (!group) {
+                return res.status(404).json({ error: 'Group not found' });
+            }
+            res.json(group);
+        } else {
+            // Return all groups
+            res.json(activeChatsConfig);
+        }
+    } catch (error) {
+        console.error('Error getting active group:', error);
+        res.status(500).json({ error: 'Failed to get active group' });
+    }
+});
+
+app.post('/api/getMessages/:groupId', (req, res) => {
+    const timestamp = new Date().toISOString();
+    console.log(`\n=== API Request [${timestamp}] ===`);
+    console.log('Request Body:', JSON.stringify(req.body, null, 2));
+
+    const { token } = req.body;
+    const groupId = req.params.groupId;
+
+    // Validate token
+    if (!token) {
+        console.log('Error: No token provided');
+        return res.status(401).json({ error: 'Token is required' });
+    }
+
+    if (token !== global.API_TOKEN) {
+        console.log('Error: Invalid token provided');
+        return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    // Validate group exists
+    if (!activeChatsConfig[groupId]) {
+        return res.status(404).json({ error: 'Group not found' });
+    }
+
+    try {
+        const messages = getMessagesForGroup(groupId);
+        res.json({
+            groupId,
+            groupName: activeChatsConfig[groupId].name,
+            messages
+        });
+    } catch (error) {
+        console.error('Error getting messages:', error);
+        res.status(500).json({ error: 'Failed to get messages' });
+    }
+});
+
+app.delete('/api/removeActive/:groupId', (req, res) => {
+    const { token } = req.query;
+    const groupId = req.params.groupId;
+
+    // Validate token
+    if (!token) {
+        console.log('Error: No token provided');
+        return res.status(401).json({ error: 'Token is required' });
+    }
+
+    if (token !== global.API_TOKEN) {
+        console.log('Error: Invalid token provided');
+        return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    try {
+        // Check if group exists
+        if (!activeChatsConfig[groupId]) {
+            return res.status(404).json({ error: 'Group not found' });
+        }
+
+        // Remove group from configuration
+        delete activeChatsConfig[groupId];
+        saveActiveChats(activeChatsConfig);
+
+        // Clear messages for this group
+        messageStoreByGroup.delete(groupId);
+
+        res.json({
+            success: true,
+            message: `Group ${groupId} removed successfully`
+        });
+    } catch (error) {
+        console.error('Error removing group:', error);
+        res.status(500).json({ error: 'Failed to remove group' });
+    }
+});
+
+// Modify the updateCachedChats function to include ready check
+async function updateCachedChats() {
+    try {
+        console.log('Checking client readiness...');
+        await waitForClientReady();
+        
+        console.log('Updating cached chats...');
+        const chats = await client.getChats();
+        const activeChats = [];
+
+        for (const chat of chats) {
+            const chatId = chat.id._serialized;
+            const chatType = getChatType(chatId);
+            
+            let chatInfo = {
+                id: chatId,
+                type: chatType,
+                name: chat.name || 'Unknown',
+                isActive: activeChatIds.size === 0 || activeChatIds.has(chatId)
+            };
+
+            if (chatType === 'Group') {
+                chatInfo.participantCount = chat.participants ? chat.participants.length : 'N/A';
+            } else {
+                const contact = await chat.getContact();
+                chatInfo.contactName = contact.name || contact.pushname || contact.number;
+                chatInfo.contactNumber = contact.number;
+            }
+
+            activeChats.push(chatInfo);
+        }
+
+        cachedChats = activeChats;
+        lastChatsUpdate = new Date();
+        console.log(`Updated cached chats at ${lastChatsUpdate.toISOString()}`);
+        return activeChats;
+    } catch (error) {
+        console.error('Error updating cached chats:', error);
+        throw error;
+    }
+}
+
+// Modify the getActiveChats endpoint to include ready check
+app.post('/api/getActiveChats', async (req, res) => {
     const timestamp = new Date().toISOString();
     console.log(`\n=== API Request [${timestamp}] ===`);
     console.log('Request Body:', JSON.stringify(req.body, null, 2));
@@ -222,141 +563,108 @@ app.post('/api/getMessages', (req, res) => {
         return res.status(401).json({ error: 'Invalid token' });
     }
 
-    // Get messages since last call
-    const newMessages = messageStore.filter(msg => msg.timestamp > lastApiCallTime);
-    
-    // Update last call time
-    lastApiCallTime = Date.now() / 1000; // Convert to Unix timestamp
-
-    console.log(`Response: Sending ${newMessages.length} messages`);
-    console.log('Messages:', JSON.stringify(newMessages, null, 2));
-    console.log('==================\n');
-
-    // Return messages
-    res.json(newMessages);
-});
-
-// Modify the message event handler to store messages
-client.on('message', async msg => {
+    // Check if client is ready
     if (!isClientReady) {
-        console.log('Client not ready yet, ignoring message');
-        return;
+        console.log('Error: WhatsApp client is not ready');
+        return res.status(503).json({ error: 'WhatsApp client is not ready' });
+    }
+
+    // Check if we have cached data
+    if (!cachedChats || !lastChatsUpdate) {
+        console.log('Error: Chat data not ready yet');
+        return res.status(503).json({ error: 'Data not ready yet' });
     }
 
     try {
-        const chat = await msg.getChat();
-        const sender = await msg.getContact();
-        const messageType = getMessageType(msg);
-        const chatType = getChatType(chat.id._serialized);
-
-        // Extract message ID (last part after "us_")
-        const messageId = msg.id._serialized.split('us_')[1] || msg.id._serialized;
-
-        // Extract from_number (digits before the @)
-        const fromNumber = msg.from.split('@')[0];
-
-        // Find links in the message text
-        const linkRegex = /(?:https?:\/\/)?(?:www\.)?[^\s]+\.[^\s]+/g;
-        const links = msg.body ? msg.body.match(linkRegex) || [] : [];
-
-        // Create the message JSON
-        const messageJson = {
-            id: messageId,
-            timestamp: msg.timestamp,
-            group: chatType === 'Group' ? chat.name : "",
-            from: sender.name || sender.number,
-            from_number: fromNumber,
-            type: messageType,
-            forwarded: msg.isForwarded,
-            text: msg.body || "",
-            links: links
-        };
-
-        // Store the message
-        messageStore.push(messageJson);
-
-        // Broadcast message to all connected WebSocket clients
-        wss.clients.forEach(client => {
-            if (client.readyState === WebSocket.OPEN) {
-                client.send(JSON.stringify({
-                    type: 'new_message',
-                    from: sender.name || sender.number,
-                    group: chatType === 'Group' ? chat.name : null,
-                    message: messageJson
-                }));
-            }
+        // Return cached data
+        console.log('Returning cached chats data');
+        return res.json({
+            chats: cachedChats,
+            lastUpdate: lastChatsUpdate.toISOString()
         });
-
-        // Log the formatted JSON
-        console.log('\n=== Message JSON ===');
-        console.log(JSON.stringify(messageJson, null, 2));
-        console.log('==================\n');
-
-        // Enhanced message logging with all available metadata
-        console.log('\n=== New Message ===');
-        console.log(`Message ID: ${msg.id._serialized}`);
-        console.log(`Timestamp: ${new Date(msg.timestamp * 1000).toISOString()}`);
-        console.log(`Chat Type: ${chatType}`);
-        console.log(`Chat ID: ${chat.id._serialized}`);
-        console.log(`Chat Name: ${chat.name || 'Unknown'}`);
-        console.log(`From: ${sender.name || sender.number}`);
-        console.log(`From ID: ${msg.from}`);
-        console.log(`To: ${msg.to}`);
-        console.log(`Message Type: ${messageType}`);
-        console.log(`Has Media: ${msg.hasMedia}`);
-        console.log(`Media Type: ${msg.type || 'N/A'}`);
-        console.log(`Is Forwarded: ${msg.isForwarded}`);
-        console.log(`Is Status: ${msg.isStatus}`);
-        console.log(`Is Starred: ${msg.isStarred}`);
-        console.log(`Is From Me: ${msg.fromMe}`);
-        console.log(`Has Quoted Message: ${msg.hasQuotedMsg}`);
-        console.log(`Body Preview: ${msg.body ? msg.body.substring(0, 20) + (msg.body.length > 20 ? '...' : '') : 'N/A'}`);
-        console.log(`VCard: ${msg.vCards.length > 0 ? 'Yes' : 'No'}`);
-        console.log(`Mentions: ${msg.mentionedIds.length > 0 ? msg.mentionedIds.join(', ') : 'None'}`);
-        console.log(`Links: ${msg.links.length > 0 ? msg.links.join(', ') : 'None'}`);
-        console.log('==================\n');
-
-        const targetGroupName = 'בדיקה';
-
-        if (chatType === 'Group' && chat.name === targetGroupName) {
-            const payload = {
-                messageId: msg.id._serialized,
-                timestamp: msg.timestamp,
-                from: msg.from,
-                to: msg.to,
-                body: msg.body,
-                chatId: chat.id._serialized,
-                chatName: chat.name,
-                isGroup: true,
-                apiToken: global.API_TOKEN,
-                messageType: messageType,
-                metadata: {
-                    hasMedia: msg.hasMedia,
-                    mediaType: msg.type,
-                    isForwarded: msg.isForwarded,
-                    isStatus: msg.isStatus,
-                    isStarred: msg.isStarred,
-                    fromMe: msg.fromMe,
-                    hasQuotedMsg: msg.hasQuotedMsg,
-                    vCards: msg.vCards,
-                    mentionedIds: msg.mentionedIds,
-                    links: msg.links
-                }
-            };
-
-            // Trigger the webhook POST request
-            try {
-                //const response = await axios.post('https://your-webhook-url.com', payload);
-                console.log(payload.body);
-                //console.log('Webhook triggered successfully:', response.status);
-            } catch (error) {
-                console.error('Error triggering webhook:', error);
-            }
-        }
-    } catch (err) {
-        console.error('Error processing message:', err);
-        console.error('Error details:', err.stack);
+    } catch (error) {
+        console.error('Error getting active chats:', error);
+        res.status(500).json({ error: 'Failed to get active chats' });
     }
+});
+
+app.post('/api/setActive', (req, res) => {
+    const timestamp = new Date().toISOString();
+    console.log(`\n=== API Request [${timestamp}] ===`);
+    console.log('Request Body:', JSON.stringify(req.body, null, 2));
+
+    const { token, chatIds } = req.body;
+
+    // Validate token
+    if (!token) {
+        console.log('Error: No token provided');
+        return res.status(401).json({ error: 'Token is required' });
+    }
+
+    if (token !== global.API_TOKEN) {
+        console.log('Error: Invalid token provided');
+        return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    // Update active chat IDs
+    if (Array.isArray(chatIds)) {
+        activeChatIds = new Set(chatIds);
+        console.log(`Set ${activeChatIds.size} active chat IDs`);
+    } else {
+        activeChatIds = new Set();
+        console.log('Reset active chat IDs to empty (all chats will be monitored)');
+    }
+
+    // Save to file
+    saveActiveChats();
+
+    res.json({ 
+        success: true, 
+        message: activeChatIds.size === 0 ? 
+            'All chats will be monitored' : 
+            `Monitoring ${activeChatIds.size} active chats`,
+        activeChatIds: Array.from(activeChatIds)
+    });
+});
+
+// Add new async update endpoint
+app.post('/api/updateChats', async (req, res) => {
+    const timestamp = new Date().toISOString();
+    console.log(`\n=== API Request [${timestamp}] ===`);
+    console.log('Request Body:', JSON.stringify(req.body, null, 2));
+
+    const { token } = req.body;
+
+    // Validate token
+    if (!token) {
+        console.log('Error: No token provided');
+        return res.status(401).json({ error: 'Token is required' });
+    }
+
+    if (token !== global.API_TOKEN) {
+        console.log('Error: Invalid token provided');
+        return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    // Check if client is ready
+    if (!isClientReady) {
+        console.log('Error: WhatsApp client is not ready');
+        return res.status(503).json({ error: 'WhatsApp client is not ready' });
+    }
+
+    // Start update process
+    updateCachedChats()
+        .then(() => {
+            res.json({ 
+                success: true, 
+                message: 'Chat update initiated',
+                lastUpdate: lastChatsUpdate.toISOString()
+            });
+        })
+        .catch(error => {
+            console.error('Error in update process:', error);
+            res.status(500).json({ error: 'Failed to update chats' });
+        });
 });
 
 // Handle authentication failure
@@ -373,12 +681,13 @@ client.on('disconnected', (reason) => {
     appState = 'disconnected';
 });
 
-// API endpoints
+// Modify the status endpoint to include last update time
 app.get('/status', (req, res) => {
     res.json({ 
         state: appState,
         isReady: isClientReady,
-        hasQr: !!qrData
+        hasQr: !!qrData,
+        lastChatsUpdate: lastChatsUpdate ? lastChatsUpdate.toISOString() : null
     });
 });
 
@@ -628,4 +937,59 @@ console.log('Initializing WhatsApp client...');
 client.initialize().catch(err => {
     console.error('Failed to initialize client:', err);
     console.error('Error details:', err.stack);
+});
+
+// Add new endpoint to get active chat configuration
+app.post('/api/getActive', (req, res) => {
+    const timestamp = new Date().toISOString();
+    console.log(`\n=== API Request [${timestamp}] ===`);
+    console.log('Request Body:', JSON.stringify(req.body, null, 2));
+
+    const { token } = req.body;
+
+    // Validate token
+    if (!token) {
+        console.log('Error: No token provided');
+        return res.status(401).json({ error: 'Token is required' });
+    }
+
+    if (token !== global.API_TOKEN) {
+        console.log('Error: Invalid token provided');
+        return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    // Check if client is ready
+    if (!isClientReady) {
+        console.log('Error: WhatsApp client is not ready');
+        return res.status(503).json({ error: 'WhatsApp client is not ready' });
+    }
+
+    try {
+        const activeChats = Array.from(activeChatIds);
+        const isMonitoringAll = activeChatIds.size === 0;
+
+        // If we have cached chats, enrich the response with chat names
+        let enrichedResponse = {
+            isMonitoringAll,
+            activeChatIds: activeChats,
+            lastUpdate: lastChatsUpdate ? lastChatsUpdate.toISOString() : null
+        };
+
+        if (cachedChats) {
+            enrichedResponse.activeChats = cachedChats
+                .filter(chat => isMonitoringAll || activeChatIds.has(chat.id))
+                .map(chat => ({
+                    id: chat.id,
+                    name: chat.name,
+                    type: chat.type,
+                    isActive: true
+                }));
+        }
+
+        console.log('Returning active chat configuration');
+        res.json(enrichedResponse);
+    } catch (error) {
+        console.error('Error getting active configuration:', error);
+        res.status(500).json({ error: 'Failed to get active configuration' });
+    }
 });

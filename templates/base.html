@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shatool Dad</title>
+    <!-- <link href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.1/dist/tailwind.min.css" rel="stylesheet"> -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              background: '#FCF3EA',
+              primary: '#104F6A',
+              accent: '#DF7833',
+              secondary: '#30A8A5',
+              highlight: '#FDC399',
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+        body { background-color: #FCF3EA; }
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(100%);
+                transition: transform 0.3s ease-in-out;
+            }
+            .sidebar.open {
+                transform: translateX(0);
+            }
+        }
+    </style>
+</head>
+<body class="font-sans text-[#104F6A] bg-[#FCF3EA] flex flex-col min-h-screen">
+    <!-- Mobile Header -->
+    <header class="md:hidden w-full bg-[#FBF4EA] h-[60px] flex items-center justify-between px-4 fixed top-0 right-0 z-20 shadow-lg">
+        <button id="mobile-menu-button" class="p-2 rounded-lg text-[#104F6A] ml-4">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+            </svg>
+        </button>
+        <div class="flex items-center flex-1">
+            <img src="/static/logo_icon.png" alt="logo" class="h-10 w-auto" />
+            <span class="text-xl font-bold text-[#104F6A] mr-3" dir="rtl">
+                <span class="text-[#104F6A]">אבא </span><span style="color:#E1773A">שתול</span>
+            </span>
+
+        </div>
+    </header>
+
+    <div class="flex flex-row-reverse flex-1 md:mt-0 mt-[60px]">
+        <!-- Sidebar -->
+        <aside id="sidebar" class="sidebar w-52 bg-[#30A8A5] text-white flex flex-col items-end min-h-screen fixed right-0 top-0 md:top-0 top-[60px] h-full z-10 md:translate-x-0" style="box-shadow: -8px 0 24px -4px rgba(0,0,0,0.15);">
+            <!-- Desktop Logo Section -->
+            <div class="hidden md:flex flex-row items-center justify-start w-full pr-4" style="height:60px; background:#FBF4EA;">
+                <img src="/static/logo_icon.png" alt="logo" class="h-10 w-auto" />
+                <span class="text-xl font-bold text-[#104F6A] mr-3" dir="rtl">
+                    <span class="text-[#104F6A]">אבא </span><span style="color:#E1773A">שתול</span>
+                </span>
+            </div>
+            <nav class="flex flex-col gap-6 w-full p-6">
+                <a href="/" class="group flex items-center gap-2 text-lg transition-all duration-200
+                    {% if active_page == 'home' %}bg-[#FBF4EA] text-[#DD7437] rounded-lg px-3 py-1.5 [&_svg]:text-[#DD7437]{% else %}hover:bg-[#FBF4EA] hover:rounded-lg px-3 py-1.5 hover:text-[#1A5B72] [&_svg]:transition-colors [&_svg]:duration-200 hover:[&_svg]:text-[#1A5B72]{% endif %}"
+                    >
+                    <!-- Home Icon -->
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-6 w-6"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10.5 12 4l9 6.5M4.5 10.5V19a1.5 1.5 0 0 0 1.5 1.5h3.75A1.25 1.25 0 0 0 11 19.25V15a1 1 0 0 1 2 0v4.25c0 .69.56 1.25 1.25 1.25H18a1.5 1.5 0 0 0 1.5-1.5v-8.5"/></svg>
+                    בית
+                </a>
+                <a href="#" class="group flex items-center gap-2 text-lg transition-all duration-200
+                    {% if active_page == 'tasks' %}bg-[#FBF4EA] text-[#DD7437] rounded-lg px-3 py-1.5 [&_svg]:text-[#DD7437]{% else %}hover:bg-[#FBF4EA] hover:rounded-lg px-3 py-1.5 hover:text-[#1A5B72] [&_svg]:transition-colors [&_svg]:duration-200 hover:[&_svg]:text-[#1A5B72]{% endif %}"
+                    >
+                    <!-- Todo List Icon -->
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-6 w-6"><path stroke-linecap="round" stroke-linejoin="round" d="M6 6.75h12M6 12h12M6 17.25h8.25"/><circle cx="4.5" cy="6.75" r="1.25" fill="#E1773A"/><circle cx="4.5" cy="12" r="1.25" fill="#E1773A"/><circle cx="4.5" cy="17.25" r="1.25" fill="#E1773A"/></svg>
+                    משימות
+                </a>
+                <a href="#" class="group flex items-center gap-2 text-lg transition-all duration-200
+                    {% if active_page == 'calendar' %}bg-[#FBF4EA] text-[#DD7437] rounded-lg px-3 py-1.5 [&_svg]:text-[#DD7437]{% else %}hover:bg-[#FBF4EA] hover:rounded-lg px-3 py-1.5 hover:text-[#1A5B72] [&_svg]:transition-colors [&_svg]:duration-200 hover:[&_svg]:text-[#1A5B72]{% endif %}"
+                    >
+                    <!-- Calendar Icon -->
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-6 w-6"><rect x="3" y="5" width="18" height="16" rx="2" fill="#fff" stroke="#30A8A5" stroke-width="1.5"/><path stroke="#30A8A5" stroke-width="1.5" stroke-linecap="round" d="M3 9h18"/><rect x="7" y="13" width="2" height="2" rx=".5" fill="#E1773A"/><rect x="11" y="13" width="2" height="2" rx=".5" fill="#E1773A"/><rect x="15" y="13" width="2" height="2" rx=".5" fill="#E1773A"/></svg>
+                    לוח-שנה
+                </a>
+                <hr class="my-4 border-t border-[#E5E7EB] mx-4 w-auto" />
+                <a href="/settings" class="group flex items-center gap-2 text-lg transition-all duration-200
+                    {% if active_page == 'settings' %}bg-[#FBF4EA] text-[#DD7437] rounded-lg px-3 py-1.5 [&_svg]:text-[#DD7437]{% else %}hover:bg-[#FBF4EA] hover:rounded-lg px-3 py-1.5 hover:text-[#1A5B72] [&_svg]:transition-colors [&_svg]:duration-200 hover:[&_svg]:text-[#1A5B72]{% endif %}"
+                    >
+                    <!-- Settings Icon -->
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-6 w-6"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.01c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 0 0 1.01 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 0 0-1.01 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 0 0-2.572 1.01c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 0 0-2.573-1.01c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 0 0-1.01-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 0 0 1.01-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.573-1.01z"/><circle cx="12" cy="12" r="3"/></svg>
+                    הגדרות
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 md:mr-64 p-8">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+
+    <script>
+        const mobileMenuButton = document.getElementById('mobile-menu-button');
+        const sidebar = document.getElementById('sidebar');
+        
+        mobileMenuButton.addEventListener('click', () => {
+            sidebar.classList.toggle('open');
+        });
+
+        // Close sidebar when clicking outside on mobile
+        document.addEventListener('click', (e) => {
+            if (window.innerWidth < 768 && 
+                !sidebar.contains(e.target) && 
+                !mobileMenuButton.contains(e.target) && 
+                sidebar.classList.contains('open')) {
+                sidebar.classList.remove('open');
+            }
+        });
+    </script>
+</body>
+</html> 

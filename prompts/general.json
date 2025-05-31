@@ -1,0 +1,49 @@
+{
+  "name": "general",
+  "description": "חילוץ מידע כללי מהודעות וואטסאפ",
+  "template": "נתח את הודעות הוואטסאפ הבאות מקבוצת הכיתה וחלץ כל מידע כללי או הודעות שמוזכרות.\n\nשקול את ההקשר הבא:\n- כיתה: {metadata[relevant_class]}\n- מורים: {metadata[teacher_names]}\n- הילד שלך: {metadata[your_kid_names]} ({metadata[your_kid_gender]})\n- הורים: {metadata[parents_names]}\n- תאריך היום: {metadata[today]}\n\nפריטים פעילים להקשר:\n{context_items}\n\nשקול את הדברים הבאים בניתוח:\n- הודעות חשובות\n- מידע כללי\n- עדכונים על פעילויות הכיתה\n- כל מידע רלוונטי אחר\n- כיצד מידע חדש קשור לפריטים פעילים קיימים\n\nהודעות:\n{messages}\n\nהחזר את התוצאות בפורמט JSON הבא:\n{\n    \"items\": [\n        {\n            \"title\": \"כותרת הפריט\",\n            \"description\": \"תיאור מפורט\",\n            \"category\": \"announcement|information|update|other\",\n            \"importance\": \"high|medium|low\",\n            \"requires_action\": true|false,\n            \"action_required\": \"תיאור הפעולה הנדרשת או null\",\n            \"source_message\": \"טקסט ההודעה המקורית\"\n        }\n    ]\n}\n",
+  "output_format": {
+    "type": "object",
+    "properties": {
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["title", "description", "category", "importance", "requires_action", "source_message"],
+          "properties": {
+            "title": {
+              "type": "string",
+              "description": "כותרת פריט המידע"
+            },
+            "description": {
+              "type": "string",
+              "description": "תיאור מפורט של המידע"
+            },
+            "category": {
+              "type": "string",
+              "enum": ["announcement", "information", "update", "other"],
+              "description": "קטגוריית המידע"
+            },
+            "importance": {
+              "type": "string",
+              "enum": ["high", "medium", "low"],
+              "description": "רמת החשיבות של המידע"
+            },
+            "requires_action": {
+              "type": "boolean",
+              "description": "האם נדרשת פעולה כלשהי"
+            },
+            "action_required": {
+              "type": ["string", "null"],
+              "description": "תיאור הפעולה הנדרשת, או null אם אין"
+            },
+            "source_message": {
+              "type": "string",
+              "description": "טקסט ההודעה המקורית שיצר פריט זה"
+            }
+          }
+        }
+      }
+    }
+  }
+} 
