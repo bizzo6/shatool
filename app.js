@@ -269,6 +269,13 @@ function getMessagesForGroup(groupId) {
     return messageStoreByGroup.get(groupId) || [];
 }
 
+// Function to get and clear messages for a specific group
+function getAndClearMessagesForGroup(groupId) {
+    const messages = messageStoreByGroup.get(groupId) || [];
+    messageStoreByGroup.set(groupId, []); // Clear the messages after getting them
+    return messages;
+}
+
 // Function to add message to group store
 function addMessageToGroup(groupId, message) {
     if (!messageStoreByGroup.has(groupId)) {
@@ -303,6 +310,18 @@ client.on('message', async msg => {
         const messageType = getMessageType(msg);
         const chatType = getChatType(chatId);
 
+        // Log message receipt and group assignment
+        console.log('\n=== New Message Received ===');
+        console.log(`From: ${sender.name || sender.number}`);
+        console.log(`Chat Type: ${chatType}`);
+        console.log(`Message Type: ${messageType}`);
+        console.log(`Text: ${msg.body || '[No text]'}`);
+        console.log('Active Groups:');
+        activeGroups.forEach(([groupId, config]) => {
+            console.log(`- Added to group: ${config.name} (ID: ${groupId})`);
+        });
+        console.log('===========================\n');
+
         // Create the message JSON
         const messageJson = {
             id: msg.id._serialized.split('us_')[1] || msg.id._serialized,
@@ -322,8 +341,11 @@ client.on('message', async msg => {
         });
 
         // Broadcast message to all connected WebSocket clients
+        console.log('Broadcasting to WebSocket clients:', wss.clients.size);
         wss.clients.forEach(client => {
+            console.log('Client state:', client.readyState);
             if (client.readyState === WebSocket.OPEN) {
+                console.log('Sending message to client');
                 client.send(JSON.stringify({
                     type: 'new_message',
                     from: sender.name || sender.number,
@@ -427,7 +449,7 @@ app.post('/api/getActive/:groupId', (req, res) => {
     }
 });
 
-app.post('/api/getMessages/:groupId', (req, res) => {
+app.post('/api/peekMessages/:groupId', (req, res) => {
     const timestamp = new Date().toISOString();
     console.log(`\n=== API Request [${timestamp}] ===`);
     console.log('Request Body:', JSON.stringify(req.body, null, 2));
@@ -453,6 +475,45 @@ app.post('/api/getMessages/:groupId', (req, res) => {
 
     try {
         const messages = getMessagesForGroup(groupId);
+        console.log(`Retrieved ${messages.length} messages for group ${groupId}`);
+        res.json({
+            groupId,
+            groupName: activeChatsConfig[groupId].name,
+            messages
+        });
+    } catch (error) {
+        console.error('Error getting messages:', error);
+        res.status(500).json({ error: 'Failed to get messages' });
+    }
+});
+
+app.post('/api/getMessages/:groupId', (req, res) => {
+    const timestamp = new Date().toISOString();
+    console.log(`\n=== API Request [${timestamp}] ===`);
+    console.log('Request Body:', JSON.stringify(req.body, null, 2));
+
+    const { token } = req.body;
+    const groupId = req.params.groupId;
+
+    // Validate token
+    if (!token) {
+        console.log('Error: No token provided');
+        return res.status(401).json({ error: 'Token is required' });
+    }
+
+    if (token !== global.API_TOKEN) {
+        console.log('Error: Invalid token provided');
+        return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    // Validate group exists
+    if (!activeChatsConfig[groupId]) {
+        return res.status(404).json({ error: 'Group not found' });
+    }
+
+    try {
+        const messages = getAndClearMessagesForGroup(groupId);
+        console.log(`Retrieved and cleared ${messages.length} messages for group ${groupId}`);
         res.json({
             groupId,
             groupName: activeChatsConfig[groupId].name,

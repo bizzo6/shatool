@@ -1,8 +1,8 @@
 services:
   - type: web
-    name: shatool-dad-monitor
+    name: shatool-dad-agent
     env: node
-    plan: free
+    plan: hobby
     buildCommand: npm install
     startCommand: npm start
     envVars:

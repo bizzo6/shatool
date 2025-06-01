@@ -1,0 +1,137 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="max-w-xl mx-auto flex flex-col gap-8 text-right">
+    <!-- Tasks Block -->
+    <div class="bg-white rounded-xl shadow-md p-8">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-2xl font-bold text-[#104F6A]">משימות</h2>
+            <div class="flex gap-2">
+                <select id="sortSelect" class="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#30A8A5]">
+                    <option value="due_date">מיין לפי תאריך</option>
+                    <option value="title">מיין לפי כותרת</option>
+                </select>
+                <button onclick="refreshTasks()" class="bg-[#30A8A5] text-white px-4 py-2 rounded-lg hover:bg-[#2a9794] transition-colors">
+                    רענן
+                </button>
+            </div>
+        </div>
+        
+        <div id="tasksContainer" class="space-y-4">
+            <!-- Tasks will be loaded here -->
+        </div>
+    </div>
+
+    <!-- Message Tracking Block -->
+    <div class="bg-white rounded-xl shadow-md p-8">
+        <h2 class="text-2xl font-bold mb-4 text-[#104F6A]">מעקב הודעות</h2>
+    </div>
+</div>
+
+<!-- Task Card Template -->
+<template id="taskCardTemplate">
+    <div class="task-card bg-[#FCF3EA] rounded-lg p-4 border-r-4 transition-all hover:shadow-md">
+        <div class="flex items-start justify-between">
+            <div class="flex items-center gap-3">
+                <div class="status-icon w-8 h-8 rounded-full flex items-center justify-center">
+                    <!-- Icon will be set dynamically -->
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-[#104F6A] task-title"></h3>
+                    <p class="text-sm text-gray-600 task-description"></p>
+                </div>
+            </div>
+            <div class="flex flex-col items-end">
+                <span class="text-sm text-[#DF7833] task-due-date"></span>
+                <span class="text-xs text-gray-500 task-priority"></span>
+            </div>
+        </div>
+    </div>
+</template>
+
+<script>
+let currentTasks = [];
+const statusIcons = {
+    'active': `<svg class="w-6 h-6 text-[#30A8A5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+    </svg>`,
+    'completed': `<svg class="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+    </svg>`,
+    'pending': `<svg class="w-6 h-6 text-[#DF7833]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+    </svg>`
+};
+
+const priorityLabels = {
+    'high': 'גבוה',
+    'medium': 'בינוני',
+    'low': 'נמוך'
+};
+
+function formatDate(dateStr) {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('he-IL');
+}
+
+function createTaskCard(task) {
+    const template = document.getElementById('taskCardTemplate');
+    const card = template.content.cloneNode(true);
+    
+    // Set task details
+    card.querySelector('.task-title').textContent = task.title;
+    card.querySelector('.task-description').textContent = task.description;
+    card.querySelector('.task-due-date').textContent = formatDate(task.due_date);
+    card.querySelector('.task-priority').textContent = `עדיפות: ${priorityLabels[task.priority] || task.priority}`;
+    
+    // Set status icon
+    const statusIcon = card.querySelector('.status-icon');
+    statusIcon.innerHTML = statusIcons[task.status] || statusIcons['pending'];
+    
+    return card;
+}
+
+function sortTasks(tasks, sortBy) {
+    return [...tasks].sort((a, b) => {
+        if (sortBy === 'due_date') {
+            return new Date(a.due_date) - new Date(b.due_date);
+        }
+        return a.title.localeCompare(b.title);
+    });
+}
+
+function displayTasks(tasks) {
+    const container = document.getElementById('tasksContainer');
+    container.innerHTML = '';
+    
+    const sortBy = document.getElementById('sortSelect').value;
+    const sortedTasks = sortTasks(tasks, sortBy);
+    
+    sortedTasks.forEach(task => {
+        container.appendChild(createTaskCard(task));
+    });
+}
+
+async function loadTasks() {
+    try {
+        const response = await fetch('/api/tasks?type=todo');
+        const data = await response.json();
+        currentTasks = data.tasks.todo || [];
+        displayTasks(currentTasks);
+    } catch (error) {
+        console.error('Error loading tasks:', error);
+    }
+}
+
+function refreshTasks() {
+    loadTasks();
+}
+
+// Initial load
+loadTasks();
+
+// Sort change handler
+document.getElementById('sortSelect').addEventListener('change', () => {
+    displayTasks(currentTasks);
+});
+</script>
+{% endblock %} 

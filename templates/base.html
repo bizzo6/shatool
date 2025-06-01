@@ -69,8 +69,8 @@
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-6 w-6"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10.5 12 4l9 6.5M4.5 10.5V19a1.5 1.5 0 0 0 1.5 1.5h3.75A1.25 1.25 0 0 0 11 19.25V15a1 1 0 0 1 2 0v4.25c0 .69.56 1.25 1.25 1.25H18a1.5 1.5 0 0 0 1.5-1.5v-8.5"/></svg>
                     בית
                 </a>
-                <a href="#" class="group flex items-center gap-2 text-lg transition-all duration-200
-                    {% if active_page == 'tasks' %}bg-[#FBF4EA] text-[#DD7437] rounded-lg px-3 py-1.5 [&_svg]:text-[#DD7437]{% else %}hover:bg-[#FBF4EA] hover:rounded-lg px-3 py-1.5 hover:text-[#1A5B72] [&_svg]:transition-colors [&_svg]:duration-200 hover:[&_svg]:text-[#1A5B72]{% endif %}"
+                <a href="/todo" class="group flex items-center gap-2 text-lg transition-all duration-200
+                    {% if active_page == 'todo' %}bg-[#FBF4EA] text-[#DD7437] rounded-lg px-3 py-1.5 [&_svg]:text-[#DD7437]{% else %}hover:bg-[#FBF4EA] hover:rounded-lg px-3 py-1.5 hover:text-[#1A5B72] [&_svg]:transition-colors [&_svg]:duration-200 hover:[&_svg]:text-[#1A5B72]{% endif %}"
                     >
                     <!-- Todo List Icon -->
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-6 w-6"><path stroke-linecap="round" stroke-linejoin="round" d="M6 6.75h12M6 12h12M6 17.25h8.25"/><circle cx="4.5" cy="6.75" r="1.25" fill="#E1773A"/><circle cx="4.5" cy="12" r="1.25" fill="#E1773A"/><circle cx="4.5" cy="17.25" r="1.25" fill="#E1773A"/></svg>
@@ -90,6 +90,15 @@
                     <!-- Settings Icon -->
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-6 w-6"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.01c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 0 0 1.01 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 0 0-1.01 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 0 0-2.572 1.01c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 0 0-2.573-1.01c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 0 0-1.01-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 0 0 1.01-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.573-1.01z"/><circle cx="12" cy="12" r="3"/></svg>
                     הגדרות
+                </a>
+                <a href="/debug" class="group flex items-center gap-2 text-lg transition-all duration-200
+                    {% if active_page == 'debug' %}bg-[#FBF4EA] text-[#DD7437] rounded-lg px-3 py-1.5 [&_svg]:text-[#DD7437]{% else %}hover:bg-[#FBF4EA] hover:rounded-lg px-3 py-1.5 hover:text-[#1A5B72] [&_svg]:transition-colors [&_svg]:duration-200 hover:[&_svg]:text-[#1A5B72]{% endif %}"
+                    >
+                    <!-- Debug Icon -->
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-6 w-6">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 0 1-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 0 1 4.5 0m0 0v5.714a2.25 2.25 0 0 0 .659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0 1 12 15a9.065 9.065 0 0 1-6.23-.693L5 14.5m14.8.8 1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0 1 12 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.067-3.61L5 14.5" />
+                    </svg>
+                    דיבוג
                 </a>
             </nav>
         </aside>

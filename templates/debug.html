@@ -1,0 +1,213 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="max-w-xl mx-auto flex flex-col gap-8 text-right">
+
+    <!-- Debug Block -->
+    <div class="bg-white rounded-xl shadow-md p-8">
+        <h2 class="text-2xl font-bold mb-4 text-[#104F6A]">דיבוג</h2>
+        <div class="flex items-center gap-4 mb-4">
+            <select id="template-select" class="form-select rounded-lg border border-gray-300 px-4 py-2 text-[#104F6A] focus:border-[#30A8A5] focus:ring focus:ring-[#30A8A5] focus:ring-opacity-50">
+                <option value="todo" selected>משימות</option>
+                <option value="calendar">לוח שנה</option>
+                <option value="general">כללי</option>
+            </select>
+            <button id="run-process" class="bg-[#30A8A5] text-white px-6 py-2 rounded-lg hover:bg-[#2a9794] transition-colors duration-200">
+                הרץ עיבוד
+            </button>
+        </div>
+    </div>
+
+    <!-- Message Debug Block -->
+    <div class="bg-white rounded-xl shadow-md p-8">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-2xl font-bold text-[#104F6A]">הודעות נסיון</h2>
+            <button id="add-message" class="bg-[#30A8A5] text-white p-2 rounded-lg hover:bg-[#2a9794] transition-colors duration-200">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                </svg>
+            </button>
+        </div>
+        <div id="message-cards" class="space-y-4">
+            <!-- Message cards will be added here -->
+        </div>
+    </div>
+
+    <!-- Log Block -->
+    <div class="bg-white rounded-xl shadow-md p-8">
+        <h2 class="text-2xl font-bold mb-4 text-[#104F6A]">לוג מערכת</h2>
+        <pre id="log-output" class="w-full h-64 font-mono text-sm p-4 rounded-lg bg-gray-50 border border-gray-300 overflow-auto whitespace-pre-wrap"></pre>
+    </div>
+</div>
+
+<template id="message-card-template">
+    <div class="message-card bg-gray-50 rounded-lg p-4 border border-gray-200">
+        <div class="flex justify-between items-start mb-4">
+            <div class="flex-1 space-y-4">
+                <div class="flex gap-4 items-start">
+                    <div class="w-[30%]">
+                        <label class="block text-sm font-medium text-[#104F6A] mb-1">מאת</label>
+                        <input type="text" class="message-from w-full rounded-lg border border-gray-300 px-3 py-2 text-[#104F6A] focus:border-[#30A8A5] focus:ring focus:ring-[#30A8A5] focus:ring-opacity-50" placeholder="שם השולח">
+                    </div>
+                    <div class="flex-1">
+                        <label class="block text-sm font-medium text-[#104F6A] mb-1">זמן</label>
+                        <div class="flex gap-2">
+                            <input type="datetime-local" class="message-time w-full rounded-lg border border-gray-300 px-3 py-2 text-[#104F6A] focus:border-[#30A8A5] focus:ring focus:ring-[#30A8A5] focus:ring-opacity-50">
+                            <button class="use-now bg-gray-200 text-[#104F6A] px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors duration-200 data-active='false'">עכשיו</button>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-[#104F6A] mb-1">הודעה</label>
+                    <textarea class="message-text w-full rounded-lg border border-gray-300 px-3 py-2 text-[#104F6A] focus:border-[#30A8A5] focus:ring focus:ring-[#30A8A5] focus:ring-opacity-50" rows="3" placeholder="תוכן ההודעה"></textarea>
+                </div>
+            </div>
+            <button class="remove-message text-red-500 hover:text-red-700 p-2">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                </svg>
+            </button>
+        </div>
+    </div>
+</template>
+
+<script>
+// Storage key for messages
+const STORAGE_KEY = 'debug_messages';
+
+// Add initial message card or restore from storage
+document.addEventListener('DOMContentLoaded', () => {
+    const savedMessages = loadMessages();
+    if (savedMessages && savedMessages.length > 0) {
+        savedMessages.forEach(msg => addMessageCard(msg));
+    } else {
+        addMessageCard();
+    }
+});
+
+// Add message card
+document.getElementById('add-message').addEventListener('click', () => addMessageCard());
+
+function addMessageCard(savedData = null) {
+    const template = document.getElementById('message-card-template');
+    const messageCards = document.getElementById('message-cards');
+    const card = template.content.cloneNode(true);
+    
+    // Add remove button functionality
+    card.querySelector('.remove-message').addEventListener('click', (e) => {
+        e.target.closest('.message-card').remove();
+        saveMessages(); // Save after removing a card
+    });
+    
+    // Add "Now" button functionality
+    const nowButton = card.querySelector('.use-now');
+    const timeInput = card.querySelector('.message-time');
+    
+    nowButton.addEventListener('click', (e) => {
+        const isActive = nowButton.dataset.active === 'true';
+        nowButton.dataset.active = !isActive;
+        
+        if (!isActive) {
+            // Activate "Now"
+            nowButton.classList.remove('bg-gray-200', 'text-[#104F6A]');
+            nowButton.classList.add('bg-[#30A8A5]', 'text-white');
+            timeInput.disabled = true;
+            timeInput.value = '';
+            timeInput.dataset.useNow = 'true';
+        } else {
+            // Deactivate "Now"
+            nowButton.classList.add('bg-gray-200', 'text-[#104F6A]');
+            nowButton.classList.remove('bg-[#30A8A5]', 'text-white');
+            timeInput.disabled = false;
+            delete timeInput.dataset.useNow;
+        }
+        saveMessages(); // Save after toggling "Now"
+    });
+
+    // Add input change listeners to save state
+    const fromInput = card.querySelector('.message-from');
+    const textInput = card.querySelector('.message-text');
+    
+    [fromInput, timeInput, textInput].forEach(input => {
+        input.addEventListener('change', () => saveMessages());
+        input.addEventListener('input', () => saveMessages());
+    });
+    
+    // Restore saved data if provided
+    if (savedData) {
+        fromInput.value = savedData.from || '';
+        textInput.value = savedData.text || '';
+        
+        if (savedData.time === 'now') {
+            nowButton.click(); // Trigger the "Now" button to set its state
+        } else if (savedData.time) {
+            timeInput.value = savedData.time;
+        }
+    }
+    
+    messageCards.appendChild(card);
+}
+
+// Save messages to local storage
+function saveMessages() {
+    const messages = Array.from(document.querySelectorAll('.message-card')).map(card => {
+        const from = card.querySelector('.message-from').value;
+        const timeInput = card.querySelector('.message-time');
+        const text = card.querySelector('.message-text').value;
+        
+        return {
+            from,
+            time: timeInput.dataset.useNow === 'true' ? 'now' : timeInput.value,
+            text
+        };
+    });
+    
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+}
+
+// Load messages from local storage
+function loadMessages() {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    return saved ? JSON.parse(saved) : null;
+}
+
+// Process messages
+document.getElementById('run-process').addEventListener('click', async () => {
+    const template = document.getElementById('template-select').value;
+    const logOutput = document.getElementById('log-output');
+    
+    try {
+        // Convert message cards to JSON
+        const messages = Array.from(document.querySelectorAll('.message-card')).map(card => {
+            const from = card.querySelector('.message-from').value;
+            const timeInput = card.querySelector('.message-time');
+            const text = card.querySelector('.message-text').value;
+            
+            return {
+                from,
+                time: timeInput.dataset.useNow === 'true' ? 'now' : timeInput.value,
+                text
+            };
+        }).filter(msg => msg.from && msg.text); // Only include messages with content
+        
+        // Show loading state
+        logOutput.textContent = 'מעבד...';
+        
+        // Make the API call
+        const response = await fetch(`/api/process/${template}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ messages })
+        });
+        
+        const result = await response.json();
+        
+        // Display the result
+        logOutput.textContent = JSON.stringify(result, null, 2);
+    } catch (error) {
+        logOutput.textContent = `שגיאה: ${error.message}`;
+    }
+});
+</script>
+{% endblock %} 
