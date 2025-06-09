@@ -329,4 +329,5 @@ def delete_prompt(name):
     return jsonify({'error': 'Prompt not found'}), 404
 
 if __name__ == '__main__':
-    app.run(port=3002, debug=True) 
+    port = int(os.getenv('WEBAPP_PORT', 3002))
+    app.run(host='0.0.0.0', port=port, debug=os.getenv('FLASK_ENV') == 'development')
