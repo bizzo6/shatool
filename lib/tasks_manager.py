@@ -5,10 +5,23 @@ from pathlib import Path
 from typing import Dict, List, Optional
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
+from dotenv import load_dotenv
+
+# Load environment variables from .env file if it exists
+PROJECT_ROOT = Path(__file__).parent.parent
+ENV_PATH = PROJECT_ROOT / '.env'
+if ENV_PATH.exists():
+    load_dotenv(ENV_PATH)
 
 class TasksManager:
-    def __init__(self, data_dir: str = "data"):
-        self.data_dir = Path(data_dir)
+    def __init__(self, data_dir: str = None):
+        # Use STORAGE_DIR from environment if available, otherwise use default
+        self.data_dir = Path(data_dir or os.getenv('STORAGE_DIR', 'data'))
+        # Create the data directory and its subdirectories if they don't exist
+        self.data_dir.mkdir(parents=True, exist_ok=True)
+        for subdir in ['todo', 'general', 'calendar']:
+            (self.data_dir / subdir).mkdir(parents=True, exist_ok=True)
+            
         self.tasks: Dict[str, List[dict]] = {
             "todo": [],
             "general": [],

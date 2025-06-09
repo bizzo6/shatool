@@ -35,9 +35,14 @@ coverage/
 notes.txt
 ai_processor/__pycache__/
 ai_processor/tests/__pycache__/
+*.pyc
 
 # Data
 data/todo
 data/calendar
 data/general
 active_chats.json
+
+# Secrets
+id_ed25519
+id_ed25519.pub
