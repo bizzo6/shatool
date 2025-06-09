@@ -2,21 +2,25 @@ services:
   - type: web
     name: shatool-dad-agent
     runtime: node
-    plan: starter
     buildCommand: npm install
     startCommand: npm start
+    domains:
+      - agent.shatool.dad
     envVars:
       - key: API_TOKEN
         sync: false
       - key: PORT
         value: 3000
+    autoDeploy: true
+    branch: main
 
   - type: web
     name: shatool-dad-app
     runtime: python
-    plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: python app_flask.py
+    domains:
+      - www.shatool.dad
     envVars:
       - key: FLASK_ENV
         value: production
