@@ -27,9 +27,30 @@
     </div>
 </div>
 
+<!-- Delete Confirmation Modal -->
+<div id="deleteModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-white rounded-xl shadow-md p-6 max-w-sm w-full mx-4">
+        <h3 class="text-xl font-bold text-[#104F6A] mb-4 text-center">האם אתה בטוח?</h3>
+        <p class="text-gray-600 mb-6 text-center">האם אתה בטוח שברצונך למחוק משימה זו?</p>
+        <div class="flex justify-center gap-4">
+            <button id="confirmDelete" class="bg-red-500 text-white px-6 py-2 rounded-lg hover:bg-red-600 transition-colors">
+                מחק
+            </button>
+            <button id="cancelDelete" class="bg-gray-300 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-400 transition-colors">
+                ביטול
+            </button>
+        </div>
+    </div>
+</div>
+
 <!-- Task Card Template -->
 <template id="taskCardTemplate">
-    <div class="task-card bg-[#FCF3EA] rounded-lg p-4 border-r-4 transition-all hover:shadow-md">
+    <div class="task-card bg-[#FCF3EA] rounded-lg p-4 border-r-4 transition-all hover:shadow-md relative">
+        <button class="delete-btn absolute top-2 right-2 text-gray-400 hover:text-red-500 transition-colors p-1">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+        </button>
         <div class="flex items-start justify-between">
             <div class="flex items-center gap-3">
                 <div class="status-icon w-8 h-8 rounded-full flex items-center justify-center">
@@ -50,6 +71,7 @@
 
 <script>
 let currentTasks = [];
+let taskToDelete = null;
 const statusIcons = {
     'active': `<svg class="w-6 h-6 text-[#30A8A5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
@@ -73,6 +95,39 @@ function formatDate(dateStr) {
     return date.toLocaleDateString('he-IL');
 }
 
+function showDeleteModal(taskId) {
+    taskToDelete = taskId;
+    const modal = document.getElementById('deleteModal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+function hideDeleteModal() {
+    const modal = document.getElementById('deleteModal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+    taskToDelete = null;
+}
+
+async function deleteTask() {
+    if (!taskToDelete) return;
+    
+    try {
+        const response = await fetch(`/api/tasks/remove/${taskToDelete}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            hideDeleteModal();
+            refreshTasks();
+        } else {
+            console.error('Failed to delete task');
+        }
+    } catch (error) {
+        console.error('Error deleting task:', error);
+    }
+}
+
 function createTaskCard(task) {
     const template = document.getElementById('taskCardTemplate');
     const card = template.content.cloneNode(true);
@@ -86,6 +141,10 @@ function createTaskCard(task) {
     // Set status icon
     const statusIcon = card.querySelector('.status-icon');
     statusIcon.innerHTML = statusIcons[task.status] || statusIcons['pending'];
+    
+    // Add delete button handler
+    const deleteBtn = card.querySelector('.delete-btn');
+    deleteBtn.addEventListener('click', () => showDeleteModal(task.id));
     
     return card;
 }
@@ -132,6 +191,17 @@ loadTasks();
 // Sort change handler
 document.getElementById('sortSelect').addEventListener('change', () => {
     displayTasks(currentTasks);
+});
+
+// Add modal event listeners
+document.getElementById('confirmDelete').addEventListener('click', deleteTask);
+document.getElementById('cancelDelete').addEventListener('click', hideDeleteModal);
+
+// Close modal when clicking outside
+document.getElementById('deleteModal').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) {
+        hideDeleteModal();
+    }
 });
 </script>
 {% endblock %} 

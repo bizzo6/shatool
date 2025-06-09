@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 from typing import Dict, Any, Optional
 from dotenv import load_dotenv
+from lib.prompt_manager import PromptManager
 
 class Config:
     """Configuration management for the AI processor."""
@@ -29,6 +30,9 @@ class Config:
     PROMPTS_DIR = PROJECT_ROOT / "prompts"
     METADATA_FILE = PROJECT_ROOT / "config" / "metadata.json"
     
+    # Initialize prompt manager
+    _prompt_manager = PromptManager(PROMPTS_DIR)
+    
     # Loaded data
     _prompts = {}
     _metadata = None
@@ -36,24 +40,20 @@ class Config:
     @classmethod
     def load_prompts(cls) -> None:
         """Load all prompt templates from the prompts directory."""
-        cls._prompts = {}
-        for prompt_file in cls.PROMPTS_DIR.glob("*.json"):
-            with open(prompt_file, 'r', encoding='utf-8') as f:
-                prompt_data = json.load(f)
-                cls._prompts[prompt_data['name']] = prompt_data
+        cls._prompts = {
+            prompt.name: prompt.to_dict()
+            for prompt in cls._prompt_manager.get_all_prompts()
+        }
     
     @classmethod
     def get_prompt_template(cls, prompt_type: str) -> str:
         """Get the template for a specific prompt type."""
-        if not cls._prompts:
-            cls.load_prompts()
+        cls.load_prompts()  # Always reload from disk
         return cls._prompts.get(prompt_type, {}).get('template')
     
     @classmethod
     def get_prompt_output_format(cls, prompt_type: str) -> dict:
-        """Get the output format for a specific prompt type."""
-        if not cls._prompts:
-            cls.load_prompts()
+        cls.load_prompts()  # Always reload from disk
         return cls._prompts.get(prompt_type, {}).get('output_format')
     
     @classmethod
@@ -67,21 +67,16 @@ class Config:
     @classmethod
     def get_prompt_description(cls, prompt_type: str) -> Optional[str]:
         """Get the description for a specific prompt type."""
-        if not cls._prompts:
-            cls.load_prompts()
-            
+        cls.load_prompts()  # Always reload from disk
         prompt_config = cls._prompts.get(prompt_type)
         if not prompt_config:
             return None
-            
         return prompt_config.get('description')
     
     @classmethod
     def list_available_prompts(cls) -> Dict[str, str]:
         """List all available prompt types and their descriptions."""
-        if not cls._prompts:
-            cls.load_prompts()
-            
+        cls.load_prompts()  # Always reload from disk
         return {
             name: config.get('description', '')
             for name, config in cls._prompts.items()

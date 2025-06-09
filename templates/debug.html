@@ -7,9 +7,7 @@
         <h2 class="text-2xl font-bold mb-4 text-[#104F6A]">דיבוג</h2>
         <div class="flex items-center gap-4 mb-4">
             <select id="template-select" class="form-select rounded-lg border border-gray-300 px-4 py-2 text-[#104F6A] focus:border-[#30A8A5] focus:ring focus:ring-[#30A8A5] focus:ring-opacity-50">
-                <option value="todo" selected>משימות</option>
-                <option value="calendar">לוח שנה</option>
-                <option value="general">כללי</option>
+                <option value="">בחר פרומפט...</option>
             </select>
             <button id="run-process" class="bg-[#30A8A5] text-white px-6 py-2 rounded-lg hover:bg-[#2a9794] transition-colors duration-200">
                 הרץ עיבוד
@@ -27,6 +25,43 @@
                 </svg>
             </button>
         </div>
+
+        <!-- Connection Controller -->
+        <div class="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <h3 class="text-lg font-semibold text-[#104F6A] mb-4">התחברות</h3>
+            <div class="flex items-center gap-4">
+                <div class="flex-1">
+                    <label class="block text-sm font-medium text-[#104F6A] mb-1">מזהה קבוצה</label>
+                    <input type="text" id="group-id" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-[#104F6A] focus:border-[#30A8A5] focus:ring focus:ring-[#30A8A5] focus:ring-opacity-50" placeholder="הכנס מזהה קבוצה">
+                </div>
+                <div class="flex gap-4">
+                    <button id="peek-messages" class="bg-[#DF7833] text-white px-6 py-2 rounded-lg hover:bg-[#c96a2d] transition-colors duration-200">
+                        הצצה
+                    </button>
+                    <button id="get-messages" class="bg-[#e53e3e] text-white px-6 py-2 rounded-lg hover:bg-[#c53030] transition-colors duration-200">
+                        קבלה
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Debug Endpoint Controller -->
+        <!-- <div class="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <div class="flex flex-col gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-[#104F6A] mb-1">כתובת נקודת קצה</label>
+                    <input type="url" id="debug-endpoint" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-[#104F6A] focus:border-[#30A8A5] focus:ring focus:ring-[#30A8A5] focus:ring-opacity-50" placeholder="https://example.com/api/debug">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-[#104F6A] mb-1">טוקן</label>
+                    <input type="text" id="debug-token" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-[#104F6A] focus:border-[#30A8A5] focus:ring focus:ring-[#30A8A5] focus:ring-opacity-50" placeholder="הכנס טוקן">
+                </div>
+                <button id="call-endpoint" class="bg-[#30A8A5] text-white px-6 py-2 rounded-lg hover:bg-[#2a9794] transition-colors duration-200">
+                    קריאה לנקודת קצה
+                </button>
+            </div>
+        </div> -->
+
         <div id="message-cards" class="space-y-4">
             <!-- Message cards will be added here -->
         </div>
@@ -71,11 +106,30 @@
 </template>
 
 <script>
-// Storage key for messages
+// Storage keys
 const STORAGE_KEY = 'debug_messages';
+// const ENDPOINT_STORAGE_KEY = 'debug_endpoint';
+// const TOKEN_STORAGE_KEY = 'debug_token';
+const GROUP_ID_STORAGE_KEY = 'debug_group_id';
 
 // Add initial message card or restore from storage
 document.addEventListener('DOMContentLoaded', () => {
+    // Restore endpoint and token
+    // const savedEndpoint = localStorage.getItem(ENDPOINT_STORAGE_KEY);
+    // const savedToken = localStorage.getItem(TOKEN_STORAGE_KEY);
+    const savedGroupId = localStorage.getItem(GROUP_ID_STORAGE_KEY);
+    
+    // if (savedEndpoint) {
+    //     document.getElementById('debug-endpoint').value = savedEndpoint;
+    // }
+    // if (savedToken) {
+    //     document.getElementById('debug-token').value = savedToken;
+    // }
+    if (savedGroupId) {
+        document.getElementById('group-id').value = savedGroupId;
+    }
+
+    // Restore messages
     const savedMessages = loadMessages();
     if (savedMessages && savedMessages.length > 0) {
         savedMessages.forEach(msg => addMessageCard(msg));
@@ -84,8 +138,123 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
+// Save endpoint and token on change
+// document.getElementById('debug-endpoint').addEventListener('change', (e) => {
+//     localStorage.setItem(ENDPOINT_STORAGE_KEY, e.target.value);
+// });
+
+// document.getElementById('debug-token').addEventListener('change', (e) => {
+//     localStorage.setItem(TOKEN_STORAGE_KEY, e.target.value);
+// });
+
+// Save group ID on change
+document.getElementById('group-id').addEventListener('change', (e) => {
+    localStorage.setItem(GROUP_ID_STORAGE_KEY, e.target.value);
+});
+
+// Call endpoint functionality
+// document.getElementById('call-endpoint').addEventListener('click', async () => {
+//     const endpoint = document.getElementById('debug-endpoint').value;
+//     const token = document.getElementById('debug-token').value;
+    
+//     if (!endpoint) {
+//         alert('נא להזין כתובת נקודת קצה');
+//         return;
+//     }
+    
+//     try {
+//         const response = await fetch('/api/debug/proxy', {
+//             method: 'POST',
+//             headers: {
+//                 'Content-Type': 'application/json',
+//             },
+//             body: JSON.stringify({ 
+//                 endpoint,
+//                 token 
+//             })
+//         });
+        
+//         const result = await response.json();
+//         console.log('Debug endpoint response:', result);
+//     } catch (error) {
+//         console.error('Error calling debug endpoint:', error);
+//     }
+// });
+
 // Add message card
 document.getElementById('add-message').addEventListener('click', () => addMessageCard());
+
+// Peek messages functionality
+document.getElementById('peek-messages').addEventListener('click', async () => {
+    const groupId = document.getElementById('group-id').value;
+    if (!groupId) {
+        alert('נא להזין מזהה קבוצה');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/messages/peek/${groupId}`);
+        const result = await response.json();
+        console.log('Peek messages response:', result);
+        
+        // Clear existing message cards
+        const messageCards = document.getElementById('message-cards');
+        messageCards.innerHTML = '';
+        
+        // Add new message cards from the response
+        if (result.messages && Array.isArray(result.messages)) {
+            result.messages.forEach(msg => {
+                // Convert timestamp to datetime-local format
+                const date = new Date(msg.timestamp * 1000);
+                const formattedDate = date.toISOString().slice(0, 16); // Format: YYYY-MM-DDTHH:mm
+                
+                addMessageCard({
+                    from: msg.from,
+                    time: formattedDate,
+                    text: msg.text
+                });
+            });
+        }
+    } catch (error) {
+        console.error('Error peeking messages:', error);
+    }
+});
+
+// Get messages functionality
+document.getElementById('get-messages').addEventListener('click', async () => {
+    const groupId = document.getElementById('group-id').value;
+    if (!groupId) {
+        alert('נא להזין מזהה קבוצה');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/messages/get/${groupId}`);
+        const result = await response.json();
+        console.log('Get messages response:', result);
+        
+        // Clear existing message cards
+        const messageCards = document.getElementById('message-cards');
+        messageCards.innerHTML = '';
+        
+        // Add new message cards from the response
+        if (result.messages && Array.isArray(result.messages)) {
+            result.messages.forEach(msg => {
+                // Convert timestamp to datetime-local format
+                const date = new Date(msg.timestamp * 1000);
+                const formattedDate = date.toISOString().slice(0, 16); // Format: YYYY-MM-DDTHH:mm
+                
+                addMessageCard({
+                    from: msg.from,
+                    time: formattedDate,
+                    text: msg.text
+                });
+            });
+        }
+    } catch (error) {
+        console.error('Error getting messages:', error);
+    }
+});
 
 function addMessageCard(savedData = null) {
     const template = document.getElementById('message-card-template');
@@ -182,9 +351,17 @@ document.getElementById('run-process').addEventListener('click', async () => {
             const timeInput = card.querySelector('.message-time');
             const text = card.querySelector('.message-text').value;
             
+            let timestamp;
+            if (timeInput.dataset.useNow === 'true') {
+                timestamp = Math.floor(Date.now() / 1000); // Current Unix timestamp
+            } else {
+                // Convert datetime-local string to Unix timestamp
+                timestamp = Math.floor(new Date(timeInput.value).getTime() / 1000);
+            }
+            
             return {
                 from,
-                time: timeInput.dataset.useNow === 'true' ? 'now' : timeInput.value,
+                time: timestamp,
                 text
             };
         }).filter(msg => msg.from && msg.text); // Only include messages with content
@@ -209,5 +386,33 @@ document.getElementById('run-process').addEventListener('click', async () => {
         logOutput.textContent = `שגיאה: ${error.message}`;
     }
 });
+
+// Load prompts for the select dropdown
+async function loadPromptOptions() {
+    try {
+        const response = await fetch('/api/prompts');
+        const data = await response.json();
+        const select = document.getElementById('template-select');
+        
+        // Clear existing options except the first one
+        while (select.options.length > 1) {
+            select.remove(1);
+        }
+        
+        // Add new options
+        data.prompts.forEach(prompt => {
+            const option = document.createElement('option');
+            option.value = prompt.name;
+            option.textContent = prompt.display_name || prompt.name;
+            select.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Failed to load prompts:', error);
+        alert('שגיאה בטעינת הפרומפטים');
+    }
+}
+
+// Load prompts when page loads
+document.addEventListener('DOMContentLoaded', loadPromptOptions);
 </script>
 {% endblock %} 

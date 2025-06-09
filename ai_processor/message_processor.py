@@ -44,11 +44,6 @@ class MessageProcessor:
             if not template:
                 raise ValueError(f"Invalid prompt type: {prompt_type}")
             
-            # Get the output format
-            output_format = Config.get_prompt_output_format(prompt_type)
-            if not output_format:
-                raise ValueError(f"No output format found for prompt type: {prompt_type}")
-            
             # Format messages for the prompt
             formatted_messages = self._format_messages(messages)
             

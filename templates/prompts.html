@@ -1,0 +1,250 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mx-auto px-4">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-2xl font-bold">ניהול פרומפטים</h1>
+        <button onclick="showNewPromptModal()" class="bg-[#30A8A5] text-white px-4 py-2 rounded-lg hover:bg-[#2A9794]">
+            פרומפט חדש
+        </button>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="prompts-grid">
+        <!-- Prompts will be loaded here -->
+    </div>
+</div>
+
+<!-- Prompt Editor Modal -->
+<div id="prompt-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+    <div class="bg-white rounded-lg p-6 w-full max-w-2xl">
+        <h2 class="text-xl font-bold mb-4">עריכת פרומפט</h2>
+        <form id="prompt-form" class="space-y-4">
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium mb-1">סוג</label>
+                    <input type="text" name="name" class="w-full border rounded-lg p-2" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">שם תצוגה</label>
+                    <input type="text" name="display_name" class="w-full border rounded-lg p-2">
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium mb-1">תיאור</label>
+                <input type="text" name="description" class="w-full border rounded-lg p-2">
+            </div>
+            <div>
+                <label class="block text-sm font-medium mb-1">תבנית</label>
+                <div class="space-y-2">
+                    <div class="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg border">
+                        <p class="font-medium mb-1">מילות מפתח זמינות:</p>
+                        <ul class="list-disc list-inside space-y-1">
+                            <li><code>{metadata[key]}</code> - גישה למטא-דאטה (כיתה, מורים, הורים)</li>
+                            <li><code>{context_items}</code> - פריטים פעילים להקשר</li>
+                            <li><code>{messages}</code> - הודעות וואטסאפ מעוצבות</li>
+                        </ul>
+                    </div>
+                    <textarea name="template" class="w-full border rounded-lg p-2 h-64 font-mono text-sm" required></textarea>
+                </div>
+            </div>
+            <div class="flex justify-end gap-2">
+                <button type="button" onclick="hidePromptModal()" class="px-4 py-2 border rounded-lg">
+                    ביטול
+                </button>
+                <button type="submit" class="bg-[#30A8A5] text-white px-4 py-2 rounded-lg">
+                    שמירה
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div id="delete-prompt-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-xl shadow-md p-6 max-w-sm w-full mx-4">
+        <h3 class="text-xl font-bold text-[#104F6A] mb-4 text-center">האם אתה בטוח?</h3>
+        <p class="text-gray-600 mb-6 text-center">האם אתה בטוח שברצונך למחוק פרומפט זה?</p>
+        <div class="flex justify-center gap-4">
+            <button id="confirm-delete-prompt" class="bg-red-500 text-white px-6 py-2 rounded-lg hover:bg-red-600 transition-colors">
+                מחק
+            </button>
+            <button id="cancel-delete-prompt" class="bg-gray-300 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-400 transition-colors">
+                ביטול
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentPromptName = null;
+let promptToDelete = null;
+
+// Load all prompts
+async function loadPrompts() {
+    try {
+        const response = await fetch('/api/prompts');
+        const data = await response.json();
+        const grid = document.getElementById('prompts-grid');
+        grid.innerHTML = '';
+        
+        data.prompts.forEach(prompt => {
+            const card = createPromptCard(prompt);
+            grid.appendChild(card);
+        });
+    } catch (error) {
+        console.error('Failed to load prompts:', error);
+        alert('שגיאה בטעינת הפרומפטים');
+    }
+}
+
+// Create a prompt card
+function createPromptCard(prompt) {
+    const div = document.createElement('div');
+    div.className = 'bg-white rounded-lg shadow p-4 relative hover:shadow-md transition-shadow flex flex-col min-h-[200px]';
+    div.innerHTML = `
+        <button onclick="showDeletePromptModal('${prompt.name}')" class="absolute top-2 left-2 text-gray-400 hover:text-red-500 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+            </svg>
+        </button>
+        <div class="pr-8 flex-grow">
+            <div class="flex items-center gap-2 mb-2">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-5 w-5 text-[#30A8A5]">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
+                </svg>
+                <h3 class="text-lg font-semibold text-right flex-1">
+                    ${prompt.display_name || prompt.name}
+                    ${prompt.display_name ? `<span class="text-sm text-gray-500 font-normal inline-block mr-1">(${prompt.name})</span>` : ''}
+                </h3>
+            </div>
+            <p class="text-gray-600 text-right">${prompt.description || ''}</p>
+        </div>
+        <div class="flex justify-end mt-4">
+            <button onclick="editPrompt('${prompt.name}')" class="bg-[#30A8A5] text-white px-4 py-2 rounded-lg hover:bg-[#2A9794] transition-colors flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                </svg>
+                עריכה
+            </button>
+        </div>
+    `;
+    return div;
+}
+
+// Show modal for new prompt
+function showNewPromptModal() {
+    currentPromptName = null;
+    document.getElementById('prompt-form').reset();
+    document.getElementById('prompt-modal').classList.remove('hidden');
+}
+
+// Show modal for editing prompt
+async function editPrompt(name) {
+    try {
+        const response = await fetch(`/api/prompts/${name}`);
+        const prompt = await response.json();
+        
+        const form = document.getElementById('prompt-form');
+        form.name.value = prompt.name;
+        form.display_name.value = prompt.display_name || '';
+        form.description.value = prompt.description || '';
+        form.template.value = prompt.template;
+        
+        currentPromptName = name;
+        document.getElementById('prompt-modal').classList.remove('hidden');
+    } catch (error) {
+        console.error('Failed to load prompt:', error);
+        alert('שגיאה בטעינת הפרומפט');
+    }
+}
+
+// Hide modal
+function hidePromptModal() {
+    document.getElementById('prompt-modal').classList.add('hidden');
+    currentPromptName = null;
+}
+
+// Handle form submission
+document.getElementById('prompt-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const formData = new FormData(e.target);
+    const promptData = {
+        name: formData.get('name'),
+        display_name: formData.get('display_name'),
+        description: formData.get('description'),
+        template: formData.get('template')
+    };
+    
+    try {
+        const url = currentPromptName ? `/api/prompts/${currentPromptName}` : '/api/prompts';
+        const method = currentPromptName ? 'PUT' : 'POST';
+        
+        const response = await fetch(url, {
+            method,
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(promptData)
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to save prompt');
+        }
+        
+        hidePromptModal();
+        loadPrompts();
+    } catch (error) {
+        console.error('Failed to save prompt:', error);
+        alert('שגיאה בשמירת הפרומפט');
+    }
+});
+
+// Show delete confirmation modal
+function showDeletePromptModal(name) {
+    promptToDelete = name;
+    document.getElementById('delete-prompt-modal').classList.remove('hidden');
+}
+
+// Hide delete confirmation modal
+function hideDeletePromptModal() {
+    document.getElementById('delete-prompt-modal').classList.add('hidden');
+    promptToDelete = null;
+}
+
+// Delete prompt
+async function deletePrompt() {
+    if (!promptToDelete) return;
+    
+    try {
+        const response = await fetch(`/api/prompts/${promptToDelete}`, {
+            method: 'DELETE'
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to delete prompt');
+        }
+        
+        hideDeletePromptModal();
+        loadPrompts();
+    } catch (error) {
+        console.error('Failed to delete prompt:', error);
+        alert('שגיאה במחיקת הפרומפט');
+    }
+}
+
+// Add modal event listeners
+document.getElementById('confirm-delete-prompt').addEventListener('click', deletePrompt);
+document.getElementById('cancel-delete-prompt').addEventListener('click', hideDeletePromptModal);
+
+// Close modal when clicking outside
+document.getElementById('delete-prompt-modal').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) {
+        hideDeletePromptModal();
+    }
+});
+
+// Load prompts when page loads
+document.addEventListener('DOMContentLoaded', loadPrompts);
+</script>
+{% endblock %} 

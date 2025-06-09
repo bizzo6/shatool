@@ -1,14 +1,52 @@
 services:
   - type: web
     name: shatool-dad-agent
-    env: node
-    plan: hobby
+    runtime: node
+    plan: starter
     buildCommand: npm install
     startCommand: npm start
     envVars:
       - key: API_TOKEN
         sync: false
-        description: Your API token for webhook authentication
       - key: PORT
         value: 3000
-        description: Port for the web interface 
+
+  - type: web
+    name: shatool-dad-app
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app_flask.py
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: API_TOKEN
+        sync: false
+      - key: AGENT_HOST
+        value: https://agent.shatool.dad
+      - key: WEBAPP_HOST
+        value: https://www.shatool.dad
+      - key: BASIC_AUTH_USERNAME
+        sync: false
+      - key: BASIC_AUTH_PASSWORD
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: GPT_MODEL
+        value: gpt-4.1-mini
+      - key: GPT_TEMPERATURE
+        value: 0.7
+      - key: GPT_MAX_TOKENS
+        value: 5000
+      - key: MAX_CONTEXT_MESSAGES
+        value: 50
+      - key: PROCESSING_INTERVAL
+        value: 300
+      - key: MAX_RETRIES
+        value: 3
+      - key: RETRY_DELAY
+        value: 5
+      - key: STORAGE_DIR
+        value: data
+    autoDeploy: true
+    branch: main

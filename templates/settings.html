@@ -2,31 +2,7 @@
 {% block content %}
 <div class="max-w-xl mx-auto flex flex-col gap-8 text-right">
     <!-- Status Block -->
-    <div class="bg-white rounded-xl shadow-md p-8">
-        <h2 class="text-2xl font-bold mb-4 text-[#104F6A]">סטאטוס אבא שתול</h2>
-        {% set state = status.get('state', 'error') %}
-        <div class="flex items-center gap-4 mb-4">
-            {% if state == 'authenticated' %}
-                <span class="inline-block w-4 h-4 rounded-full bg-[#30A8A5]"></span>
-                <span class="text-lg text-[#30A8A5] font-semibold">מוכן - אבא מאזין!</span>
-            {% elif state == 'waiting_for_qr' %}
-                <span class="inline-block w-4 h-4 rounded-full bg-[#FDC399]"></span>
-                <span class="text-lg text-[#DF7833] font-semibold">ממתין לסריקת קוד QR</span>
-            {% elif state == 'starting' %}
-                <span class="inline-block w-4 h-4 rounded-full bg-[#FDC399]"></span>
-                <span class="text-lg text-[#DF7833] font-semibold">מתחיל...</span>
-            {% else %}
-                <span class="inline-block w-4 h-4 rounded-full bg-red-500"></span>
-                <span class="text-lg text-red-600 font-semibold">שגיאה / מנותק</span>
-            {% endif %}
-        </div>
-        {% if status.get('lastChatsUpdate') %}
-            <div class="text-sm text-[#104F6A]">עודכן לאחרונה: {{ status['lastChatsUpdate']|replace('T', ' ')|replace('Z', '') }}</div>
-        {% endif %}
-        {% if status.get('error') %}
-            <div class="text-sm text-red-600 mt-2">שגיאה: {{ status['error'] }}</div>
-        {% endif %}
-    </div>
+
     <!-- שתולים Settings Block -->
     <div class="bg-white rounded-xl shadow-md p-8">
         <h2 class="text-2xl font-bold mb-4 text-[#104F6A]">הגדרות שתולים</h2>
