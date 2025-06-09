@@ -25,7 +25,6 @@ services:
       - key: FLASK_ENV
         value: production
       - key: API_TOKEN
-        value: SECRET
         sync: false
       - key: AGENT_HOST
         value: https://agent.shatool.dad
