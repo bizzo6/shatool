@@ -8,7 +8,7 @@ services:
       - agent.shatool.dad
     envVars:
       - key: API_TOKEN
-        sync: false
+        sync: SECRET
       - key: PORT
         value: 3000
     autoDeploy: true
@@ -25,17 +25,17 @@ services:
       - key: FLASK_ENV
         value: production
       - key: API_TOKEN
-        sync: false
+        sync: SECRET
       - key: AGENT_HOST
         value: https://agent.shatool.dad
       - key: WEBAPP_HOST
         value: https://www.shatool.dad
       - key: BASIC_AUTH_USERNAME
-        sync: false
+        sync: SECRET
       - key: BASIC_AUTH_PASSWORD
-        sync: false
+        sync: SECRET
       - key: OPENAI_API_KEY
-        sync: false
+        sync: SECRET
       - key: GPT_MODEL
         value: gpt-4.1-mini
       - key: GPT_TEMPERATURE
