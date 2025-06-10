@@ -22,7 +22,26 @@ app = Flask(__name__)
 app.config['BASIC_AUTH_USERNAME'] = os.getenv('BASIC_AUTH_USERNAME')
 app.config['BASIC_AUTH_PASSWORD'] = os.getenv('BASIC_AUTH_PASSWORD')
 app.config['BASIC_AUTH_FORCE'] = True  # Force authentication on all routes
+
+# Create a list of paths that should be exempt from authentication
+exempt_paths = [
+    '/static/manifest.json',
+    '/manifest.json',
+    '/static/sw.js',
+    '/static/icon-192x192.png',
+    '/static/icon-512x512.png',
+    '/static/icon-144x144.png'
+]
+
+# Create a custom authentication check
+def custom_auth_check():
+    if request.path in exempt_paths:
+        return True
+    return basic_auth.authenticate()
+
+# Initialize basic auth with custom check
 basic_auth = BasicAuth(app)
+basic_auth.authenticate = custom_auth_check
 
 # Get environment variables
 API_TOKEN = os.getenv('API_TOKEN')
@@ -335,6 +354,15 @@ def delete_prompt(name):
 def serve_manifest():
     return send_from_directory('static', 'manifest.json', 
                              mimetype='application/manifest+json',
+                             headers={
+                                 'Cache-Control': 'no-cache',
+                                 'Service-Worker-Allowed': '/'
+                             })
+
+@app.route('/static/sw.js')
+def serve_service_worker():
+    return send_from_directory('static', 'sw.js',
+                             mimetype='application/javascript',
                              headers={
                                  'Cache-Control': 'no-cache',
                                  'Service-Worker-Allowed': '/'
