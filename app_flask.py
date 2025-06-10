@@ -331,9 +331,14 @@ def delete_prompt(name):
         return jsonify({'success': True})
     return jsonify({'error': 'Prompt not found'}), 404
 
-@app.route('/static/manifest.json')
+@app.route('/manifest.json')
 def serve_manifest():
-    return send_from_directory('static', 'manifest.json', mimetype='application/manifest+json')
+    return send_from_directory('static', 'manifest.json', 
+                             mimetype='application/manifest+json',
+                             headers={
+                                 'Cache-Control': 'no-cache',
+                                 'Service-Worker-Allowed': '/'
+                             })
 
 if __name__ == '__main__':
     port = int(os.getenv('WEBAPP_PORT', 3002))

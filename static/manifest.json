@@ -2,11 +2,12 @@
     "name": "Shatool Dad",
     "short_name": "Shatool",
     "description": "Shatool Dad - Task Management App",
-    "start_url": "/",
+    "start_url": "/?source=pwa",
     "display": "standalone",
     "background_color": "#FCF3EA",
     "theme_color": "#30A8A5",
     "orientation": "portrait",
+    "scope": "/",
     "icons": [
         {
             "src": "/static/icon-192x192.png",
@@ -17,6 +18,12 @@
         {
             "src": "/static/icon-512x512.png",
             "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "/static/icon-144x144.png",
+            "sizes": "144x144",
             "type": "image/png",
             "purpose": "any maskable"
         }
