@@ -1,4 +1,4 @@
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, send_from_directory
 from flask_talisman import Talisman
 from flask_basicauth import BasicAuth
 import requests
@@ -32,9 +32,12 @@ SELF = "'self'"
 TAILWIND = "https://cdn.tailwindcss.com"
 talisman_csp = {
     'default-src': [SELF],
-    'script-src': [SELF, TAILWIND, "'unsafe-inline'"],
+    'script-src': [SELF, TAILWIND, "'unsafe-inline'", "'unsafe-eval'"],
     'style-src': [SELF, "'unsafe-inline'"],
-    'img-src': [SELF, "data:"]
+    'img-src': [SELF, "data:", "blob:"],
+    'connect-src': [SELF, AGENT_HOST],
+    'manifest-src': [SELF],
+    'service-worker-src': [SELF]
 }
 Talisman(app, content_security_policy=talisman_csp)
 
@@ -327,6 +330,10 @@ def delete_prompt(name):
     if prompt_manager.delete_prompt(name):
         return jsonify({'success': True})
     return jsonify({'error': 'Prompt not found'}), 404
+
+@app.route('/static/manifest.json')
+def serve_manifest():
+    return send_from_directory('static', 'manifest.json', mimetype='application/manifest+json')
 
 if __name__ == '__main__':
     port = int(os.getenv('WEBAPP_PORT', 3002))
