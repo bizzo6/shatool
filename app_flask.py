@@ -1,4 +1,4 @@
-from flask import Flask, render_template, jsonify, request, send_from_directory, make_response
+from flask import Flask, render_template, jsonify, request, send_from_directory, make_response, send_file
 from flask_talisman import Talisman
 from flask_basicauth import BasicAuth
 import requests
@@ -12,6 +12,7 @@ import os
 from dotenv import load_dotenv
 from lib.prompt_manager import PromptManager
 from models.prompt import Prompt
+from functools import wraps
 
 # Load environment variables
 load_dotenv()
@@ -21,13 +22,14 @@ app = Flask(__name__)
 # Configure Basic Auth
 app.config['BASIC_AUTH_USERNAME'] = os.getenv('BASIC_AUTH_USERNAME')
 app.config['BASIC_AUTH_PASSWORD'] = os.getenv('BASIC_AUTH_PASSWORD')
-app.config['BASIC_AUTH_FORCE'] = True  # Force authentication on all routes
+app.config['BASIC_AUTH_FORCE'] = False  # Don't force authentication globally
 
 # Create a list of paths that should be exempt from authentication
 exempt_paths = [
     '/static/manifest.json',
     '/manifest.json',
     '/static/sw.js',
+    '/sw.js',
     '/static/icon-192x192.png',
     '/static/icon-512x512.png',
     '/static/icon-144x144.png',
@@ -37,12 +39,40 @@ exempt_paths = [
 # Initialize basic auth
 basic_auth = BasicAuth(app)
 
-# Override the basic auth check
-@basic_auth.required
+# Add before_request handler to check paths
+@app.before_request
 def check_auth():
-    if request.path in exempt_paths:
-        return True
-    return basic_auth.authenticate()
+    if request.path not in exempt_paths:
+        return basic_auth.required(lambda: None)()
+
+# Custom static file handler
+@app.route('/static/<path:filename>')
+def custom_static(filename):
+    if filename in ['manifest.json', 'sw.js', 'icon-192x192.png', 'icon-512x512.png', 'icon-144x144.png']:
+        return send_from_directory('static', filename)
+    return send_from_directory('static', filename)
+
+# Add a direct route for manifest.json
+@app.route('/manifest.json')
+def serve_manifest():
+    response = make_response(send_from_directory('static', 'manifest.json', 
+                             mimetype='application/manifest+json'))
+    response.headers['Cache-Control'] = 'no-cache'
+    response.headers['Service-Worker-Allowed'] = '/'
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Credentials'] = 'true'
+    return response
+
+# Add a direct route for service worker
+@app.route('/sw.js')
+def serve_service_worker():
+    response = make_response(send_from_directory('static', 'sw.js',
+                             mimetype='application/javascript'))
+    response.headers['Cache-Control'] = 'no-cache'
+    response.headers['Service-Worker-Allowed'] = '/'
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Credentials'] = 'true'
+    return response
 
 # Get environment variables
 API_TOKEN = os.getenv('API_TOKEN')
@@ -56,9 +86,11 @@ talisman_csp = {
     'script-src': [SELF, TAILWIND, "'unsafe-inline'", "'unsafe-eval'"],
     'style-src': [SELF, "'unsafe-inline'"],
     'img-src': [SELF, "data:", "blob:"],
-    'connect-src': [SELF, AGENT_HOST],
+    'connect-src': [SELF, AGENT_HOST, TAILWIND],
     'manifest-src': [SELF],
-    'service-worker-src': [SELF]
+    'worker-src': [SELF],
+    'child-src': [SELF],
+    'frame-src': [SELF]
 }
 
 # Configure Talisman based on environment
@@ -97,6 +129,7 @@ app.json.ensure_ascii = False
 # FDC399 - highlight
 
 @app.route('/')
+@basic_auth.required
 def home():
     # Get WhatsApp client status from agent host
     try:
@@ -110,6 +143,7 @@ def home():
     return render_template('home.html', status=status, tasks=tasks, active_page='home')
 
 @app.route('/settings')
+@basic_auth.required
 def settings():
     try:
         resp = requests.get('http://localhost:3000/status', timeout=2)
@@ -119,18 +153,22 @@ def settings():
     return render_template('settings.html', status=status, active_page='settings')
 
 @app.route('/prompts')
+@basic_auth.required
 def prompts():
     return render_template('prompts.html', active_page='prompts')
 
 @app.route('/todo')
+@basic_auth.required
 def todo():
     return render_template('todo.html', active_page='todo')
 
 @app.route('/debug')
+@basic_auth.required
 def debug():
     return render_template('debug.html', active_page='debug')
 
 @app.route('/api/tasks')
+@basic_auth.required
 def get_tasks():
     """API endpoint to get all tasks"""
     task_type = request.args.get('type')
@@ -141,6 +179,7 @@ def get_tasks():
     })
 
 @app.route('/api/tasks/refresh', methods=['POST'])
+@basic_auth.required
 def refresh_tasks():
     """API endpoint to manually refresh tasks"""
     tasks_manager.refresh()
@@ -150,6 +189,7 @@ def refresh_tasks():
     })
 
 @app.route('/api/tasks/set/<task_id>', methods=['POST'])
+@basic_auth.required
 def update_task(task_id):
     """API endpoint to update task properties"""
     if not request.is_json:
@@ -170,6 +210,7 @@ def update_task(task_id):
         return jsonify({'error': 'Task not found or update failed'}), 404
 
 @app.route('/api/tasks/remove/<task_id>', methods=['DELETE'])
+@basic_auth.required
 def delete_task(task_id):
     """API endpoint to delete a task"""
     success = tasks_manager.delete_task(task_id)
@@ -183,6 +224,7 @@ def delete_task(task_id):
         return jsonify({'error': 'Task not found or deletion failed'}), 404
 
 @app.route('/api/process/<template>', methods=['POST'])
+@basic_auth.required
 async def process_messages(template):
     """
     Process messages using AI processor with specified template.
@@ -239,6 +281,7 @@ async def process_messages(template):
         }), 500
 
 @app.route('/api/messages/get/<groupid>', methods=['GET'])
+@basic_auth.required
 def get_messages(groupid):
     """
     Proxy endpoint to get messages from a specific group using the agent interface.
@@ -273,6 +316,7 @@ def get_messages(groupid):
         }), 500
 
 @app.route('/api/messages/peek/<groupid>', methods=['GET'])
+@basic_auth.required
 def peek_messages(groupid):
     """
     Proxy endpoint to peek messages from a specific group using the agent interface.
@@ -307,6 +351,7 @@ def peek_messages(groupid):
         }), 500
 
 @app.route('/api/prompts', methods=['GET'])
+@basic_auth.required
 def list_prompts():
     """Get all available prompts"""
     prompts = prompt_manager.get_all_prompts()
@@ -315,6 +360,7 @@ def list_prompts():
     })
 
 @app.route('/api/prompts/<name>', methods=['GET'])
+@basic_auth.required
 def get_prompt(name):
     """Get a specific prompt by name"""
     prompt = prompt_manager.get_prompt(name)
@@ -323,6 +369,7 @@ def get_prompt(name):
     return jsonify(prompt.to_dict())
 
 @app.route('/api/prompts', methods=['POST'])
+@basic_auth.required
 def create_prompt():
     """Create a new prompt"""
     if not request.is_json:
@@ -340,6 +387,7 @@ def create_prompt():
         return jsonify({'error': f'Unexpected error: {str(e)}'}), 500
 
 @app.route('/api/prompts/<name>', methods=['PUT'])
+@basic_auth.required
 def update_prompt(name):
     """Update an existing prompt"""
     if not request.is_json:
@@ -359,27 +407,12 @@ def update_prompt(name):
         return jsonify({'error': f'Unexpected error: {str(e)}'}), 500
 
 @app.route('/api/prompts/<name>', methods=['DELETE'])
+@basic_auth.required
 def delete_prompt(name):
     """Delete a prompt"""
     if prompt_manager.delete_prompt(name):
         return jsonify({'success': True})
     return jsonify({'error': 'Prompt not found'}), 404
-
-@app.route('/manifest.json')
-def serve_manifest():
-    response = make_response(send_from_directory('static', 'manifest.json', 
-                             mimetype='application/manifest+json'))
-    response.headers['Cache-Control'] = 'no-cache'
-    response.headers['Service-Worker-Allowed'] = '/'
-    return response
-
-@app.route('/static/sw.js')
-def serve_service_worker():
-    response = make_response(send_from_directory('static', 'sw.js',
-                             mimetype='application/javascript'))
-    response.headers['Cache-Control'] = 'no-cache'
-    response.headers['Service-Worker-Allowed'] = '/'
-    return response
 
 @app.route('/favicon.ico')
 def favicon():
@@ -388,7 +421,7 @@ def favicon():
 if __name__ == '__main__':
     port = int(os.getenv('WEBAPP_PORT', 3002))
     if IS_DEVELOPMENT:
-        # In development, run without SSL
+        # In development, allow HTTP
         app.run(host='0.0.0.0', port=port, debug=True)
     else:
         # In production, you should use a proper SSL certificate

@@ -15,7 +15,7 @@
     <meta name="application-name" content="Shatool Dad">
     
     <!-- PWA Icons -->
-    <link rel="manifest" href="/manifest.json">
+    <link rel="manifest" href="/static/manifest.json">
     <link rel="apple-touch-icon" href="/static/icon-192x192.png">
     <link rel="icon" type="image/png" sizes="192x192" href="/static/icon-192x192.png">
     <link rel="icon" type="image/png" sizes="512x512" href="/static/icon-512x512.png">
@@ -156,7 +156,7 @@
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/static/sw.js', { scope: '/' })
+                navigator.serviceWorker.register('/sw.js', { scope: '/' })
                     .then(registration => {
                         console.log('ServiceWorker registration successful with scope: ', registration.scope);
                     })
