@@ -1,4 +1,4 @@
-from flask import Flask, render_template, jsonify, request, send_from_directory
+from flask import Flask, render_template, jsonify, request, send_from_directory, make_response
 from flask_talisman import Talisman
 from flask_basicauth import BasicAuth
 import requests
@@ -30,22 +30,24 @@ exempt_paths = [
     '/static/sw.js',
     '/static/icon-192x192.png',
     '/static/icon-512x512.png',
-    '/static/icon-144x144.png'
+    '/static/icon-144x144.png',
+    '/favicon.ico'
 ]
 
-# Create a custom authentication check
-def custom_auth_check():
+# Initialize basic auth
+basic_auth = BasicAuth(app)
+
+# Override the basic auth check
+@basic_auth.required
+def check_auth():
     if request.path in exempt_paths:
         return True
     return basic_auth.authenticate()
 
-# Initialize basic auth with custom check
-basic_auth = BasicAuth(app)
-basic_auth.authenticate = custom_auth_check
-
 # Get environment variables
 API_TOKEN = os.getenv('API_TOKEN')
 AGENT_HOST = os.getenv('AGENT_HOST', 'https://agent.shatool.dad')
+IS_DEVELOPMENT = os.getenv('FLASK_ENV') == 'development'
 
 SELF = "'self'"
 TAILWIND = "https://cdn.tailwindcss.com"
@@ -58,7 +60,20 @@ talisman_csp = {
     'manifest-src': [SELF],
     'service-worker-src': [SELF]
 }
-Talisman(app, content_security_policy=talisman_csp)
+
+# Configure Talisman based on environment
+if IS_DEVELOPMENT:
+    # In development, allow HTTP
+    Talisman(app, 
+             content_security_policy=talisman_csp,
+             force_https=False)
+else:
+    # In production, enforce HTTPS
+    Talisman(app, 
+             content_security_policy=talisman_csp,
+             force_https=True,
+             strict_transport_security=True,
+             session_cookie_secure=True)
 
 # Initialize tasks manager
 tasks_manager = TasksManager()
@@ -352,22 +367,33 @@ def delete_prompt(name):
 
 @app.route('/manifest.json')
 def serve_manifest():
-    return send_from_directory('static', 'manifest.json', 
-                             mimetype='application/manifest+json',
-                             headers={
-                                 'Cache-Control': 'no-cache',
-                                 'Service-Worker-Allowed': '/'
-                             })
+    response = make_response(send_from_directory('static', 'manifest.json', 
+                             mimetype='application/manifest+json'))
+    response.headers['Cache-Control'] = 'no-cache'
+    response.headers['Service-Worker-Allowed'] = '/'
+    return response
 
 @app.route('/static/sw.js')
 def serve_service_worker():
-    return send_from_directory('static', 'sw.js',
-                             mimetype='application/javascript',
-                             headers={
-                                 'Cache-Control': 'no-cache',
-                                 'Service-Worker-Allowed': '/'
-                             })
+    response = make_response(send_from_directory('static', 'sw.js',
+                             mimetype='application/javascript'))
+    response.headers['Cache-Control'] = 'no-cache'
+    response.headers['Service-Worker-Allowed'] = '/'
+    return response
+
+@app.route('/favicon.ico')
+def favicon():
+    return send_from_directory('static', 'favicon.ico', mimetype='image/x-icon')
 
 if __name__ == '__main__':
     port = int(os.getenv('WEBAPP_PORT', 3002))
-    app.run(host='0.0.0.0', port=port, debug=os.getenv('FLASK_ENV') == 'development')
+    if IS_DEVELOPMENT:
+        # In development, run without SSL
+        app.run(host='0.0.0.0', port=port, debug=True)
+    else:
+        # In production, you should use a proper SSL certificate
+        # This is just an example - in production, you should use a proper SSL setup
+        ssl_context = None
+        if os.path.exists('cert.pem') and os.path.exists('key.pem'):
+            ssl_context = ('cert.pem', 'key.pem')
+        app.run(host='0.0.0.0', port=port, ssl_context=ssl_context)
