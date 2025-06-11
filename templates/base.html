@@ -33,13 +33,24 @@
               accent: '#DF7833',
               secondary: '#30A8A5',
               highlight: '#FDC399',
+            },
+            fontSize: {
+              'xs': '0.75rem',
+              'sm': '0.875rem',
+              'base': '0.9375rem',
+              'lg': '1rem',
+              'xl': '1.125rem',
+              '2xl': '1.25rem',
             }
           }
         }
       }
     </script>
     <style>
-        body { background-color: #FCF3EA; }
+        body { 
+            background-color: #FCF3EA;
+            font-size: 0.9375rem;
+        }
         @media (max-width: 768px) {
             .sidebar {
                 transform: translateX(100%);
@@ -48,37 +59,41 @@
             .sidebar.open {
                 transform: translateX(0);
             }
+            .mobile-container {
+                max-width: 100%;
+                padding-left: 0.75rem;
+                padding-right: 0.75rem;
+            }
         }
     </style>
 </head>
 <body class="font-sans text-[#104F6A] bg-[#FCF3EA] flex flex-col min-h-screen">
     <!-- Mobile Header -->
-    <header class="md:hidden w-full bg-[#FBF4EA] h-[60px] flex items-center justify-between px-4 fixed top-0 right-0 z-20 shadow-lg">
-        <button id="mobile-menu-button" class="p-2 rounded-lg text-[#104F6A] ml-4">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+    <header class="md:hidden w-full bg-[#FBF4EA] h-[50px] flex items-center justify-between px-3 fixed top-0 right-0 z-20 shadow-lg">
+        <button id="mobile-menu-button" class="p-1.5 rounded-lg text-[#104F6A] ml-2">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
             </svg>
         </button>
         <div class="flex items-center flex-1">
-            <img src="/static/logo_icon.png" alt="logo" class="h-10 w-auto" />
-            <span class="text-xl font-bold text-[#104F6A] mr-3" dir="rtl">
+            <img src="/static/logo_icon.png" alt="logo" class="h-8 w-auto" />
+            <span class="text-lg font-bold text-[#104F6A] mr-2" dir="rtl">
                 <span class="text-[#104F6A]">אבא </span><span style="color:#E1773A">שתול</span>
             </span>
-
         </div>
     </header>
 
-    <div class="flex flex-row-reverse flex-1 md:mt-0 mt-[60px]">
+    <div class="flex flex-row-reverse flex-1 md:mt-0 mt-[50px]">
         <!-- Sidebar -->
-        <aside id="sidebar" class="sidebar w-52 bg-[#30A8A5] text-white flex flex-col items-end min-h-screen fixed right-0 top-0 md:top-0 top-[60px] h-full z-10 md:translate-x-0" style="box-shadow: -8px 0 24px -4px rgba(0,0,0,0.15);">
+        <aside id="sidebar" class="sidebar w-48 bg-[#30A8A5] text-white flex flex-col items-end min-h-screen fixed right-0 top-0 md:top-0 top-[50px] h-full z-10 md:translate-x-0" style="box-shadow: -8px 0 24px -4px rgba(0,0,0,0.15);">
             <!-- Desktop Logo Section -->
-            <div class="hidden md:flex flex-row items-center justify-start w-full pr-4" style="height:60px; background:#FBF4EA;">
-                <img src="/static/logo_icon.png" alt="logo" class="h-10 w-auto" />
-                <span class="text-xl font-bold text-[#104F6A] mr-3" dir="rtl">
+            <div class="hidden md:flex flex-row items-center justify-start w-full pr-3" style="height:50px; background:#FBF4EA;">
+                <img src="/static/logo_icon.png" alt="logo" class="h-8 w-auto" />
+                <span class="text-lg font-bold text-[#104F6A] mr-2" dir="rtl">
                     <span class="text-[#104F6A]">אבא </span><span style="color:#E1773A">שתול</span>
                 </span>
             </div>
-            <nav class="flex flex-col gap-6 w-full p-6">
+            <nav class="flex flex-col gap-4 w-full p-4">
                 <a href="/" class="group flex items-center gap-2 text-lg transition-all duration-200
                     {% if active_page == 'home' %}bg-[#FBF4EA] text-[#DD7437] rounded-lg px-3 py-1.5 [&_svg]:text-[#DD7437]{% else %}hover:bg-[#FBF4EA] hover:rounded-lg px-3 py-1.5 hover:text-[#1A5B72] [&_svg]:transition-colors [&_svg]:duration-200 hover:[&_svg]:text-[#1A5B72]{% endif %}"
                     >
@@ -130,7 +145,7 @@
         </aside>
 
         <!-- Main Content -->
-        <main class="flex-1 md:mr-64 p-8">
+        <main class="flex-1 md:mr-48 p-4 md:p-6 mobile-container">
             {% block content %}{% endblock %}
         </main>
     </div>
