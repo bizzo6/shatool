@@ -1,12 +1,27 @@
 const CACHE_NAME = 'shatool-cache-v1';
 const urlsToCache = [
-    '/',
     '/static/logo_icon.png',
     '/static/logo_sidebar.png',
     '/static/icon-192x192.png',
     '/static/icon-512x512.png',
     '/static/icon-144x144.png',
     '/static/manifest.json'
+];
+
+// List of file extensions that should be cached
+const CACHEABLE_EXTENSIONS = [
+    '.css',
+    '.js',
+    '.png',
+    '.jpg',
+    '.jpeg',
+    '.gif',
+    '.svg',
+    '.ico',
+    '.woff',
+    '.woff2',
+    '.ttf',
+    '.eot'
 ];
 
 self.addEventListener('install', event => {
@@ -20,6 +35,31 @@ self.addEventListener('install', event => {
 });
 
 self.addEventListener('fetch', event => {
+    // Always fetch from network for Tailwind CDN
+    if (event.request.url.includes('cdn.tailwindcss.com')) {
+        event.respondWith(
+            fetch(event.request)
+                .catch(error => {
+                    console.error('Tailwind fetch failed:', error);
+                    return new Response('/* Tailwind CSS fallback */', {
+                        headers: { 'Content-Type': 'text/css' }
+                    });
+                })
+        );
+        return;
+    }
+
+    // Check if the request is for a cacheable resource
+    const url = new URL(event.request.url);
+    const isCacheable = CACHEABLE_EXTENSIONS.some(ext => url.pathname.endsWith(ext));
+
+    // If it's not a cacheable resource (like HTML pages), always fetch from network
+    if (!isCacheable) {
+        event.respondWith(fetch(event.request));
+        return;
+    }
+
+    // For cacheable resources, use cache-first strategy
     event.respondWith(
         caches.match(event.request)
             .then(response => {
@@ -60,12 +100,6 @@ self.addEventListener('fetch', event => {
                     })
                     .catch(error => {
                         console.error('Fetch failed:', error);
-                        // Return a fallback response if fetch fails
-                        if (event.request.url.includes('tailwindcss.com')) {
-                            return new Response('/* Tailwind CSS fallback */', {
-                                headers: { 'Content-Type': 'text/css' }
-                            });
-                        }
                         throw error;
                     });
             })
