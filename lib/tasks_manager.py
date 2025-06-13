@@ -28,18 +28,27 @@ class TasksManager:
             "calendar": []
         }
         self.last_update = 0
+        self.observer = None
         self._setup_file_watcher()
         self.refresh()
 
     def _setup_file_watcher(self):
         """Setup file system watcher to detect changes in data directory"""
+        if self.observer is not None:
+            self.cleanup()
+            
         class TasksEventHandler(FileSystemEventHandler):
             def __init__(self, manager):
                 self.manager = manager
+                self.last_refresh = 0
+                self.refresh_cooldown = 1  # Minimum seconds between refreshes
 
             def on_any_event(self, event):
                 if not event.is_directory and event.src_path.endswith('.json'):
-                    self.manager.refresh()
+                    current_time = time.time()
+                    if current_time - self.last_refresh >= self.refresh_cooldown:
+                        self.manager.refresh()
+                        self.last_refresh = current_time
 
         self.observer = Observer()
         self.observer.schedule(
@@ -49,15 +58,23 @@ class TasksManager:
         )
         self.observer.start()
 
-    def _load_tasks_from_folder(self, task_type: str) -> List[dict]:
-        """Load all tasks from a specific type folder"""
+    def _load_tasks_from_folder(self, task_type: str, limit: int = 100, offset: int = 0) -> List[dict]:
+        """Load tasks from a specific type folder with pagination"""
         tasks = []
         type_dir = self.data_dir / task_type
         
         if not type_dir.exists():
             return tasks
 
-        for file_path in type_dir.glob("*.json"):
+        # Get all JSON files and sort by modification time (newest first)
+        files = sorted(type_dir.glob("*.json"), key=lambda x: x.stat().st_mtime, reverse=True)
+        
+        # Apply pagination
+        start = offset
+        end = offset + limit
+        paginated_files = files[start:end]
+
+        for file_path in paginated_files:
             try:
                 with open(file_path, 'r', encoding='utf-8') as f:
                     task = json.load(f)
@@ -132,18 +149,31 @@ class TasksManager:
             self.tasks[task_type] = self._load_tasks_from_folder(task_type)
         self.last_update = time.time()
 
-    def get_tasks(self, task_type: Optional[str] = None) -> Dict[str, List[dict]]:
-        """Get all tasks or tasks of a specific type"""
+    def get_tasks(self, task_type: Optional[str] = None, limit: int = 100, offset: int = 0) -> Dict[str, List[dict]]:
+        """Get tasks with pagination"""
         if task_type:
-            return {task_type: self.tasks.get(task_type, [])}
-        return self.tasks
+            return {task_type: self._load_tasks_from_folder(task_type, limit, offset)}
+        
+        result = {}
+        for t_type in self.tasks.keys():
+            result[t_type] = self._load_tasks_from_folder(t_type, limit, offset)
+        return result
 
     def get_last_update(self) -> float:
         """Get timestamp of last update"""
         return self.last_update
 
+    def cleanup(self):
+        """Cleanup resources"""
+        if self.observer is not None:
+            try:
+                self.observer.stop()
+                self.observer.join(timeout=1)
+            except Exception as e:
+                print(f"Error stopping observer: {e}")
+            finally:
+                self.observer = None
+
     def __del__(self):
         """Cleanup observer when object is destroyed"""
-        if hasattr(self, 'observer'):
-            self.observer.stop()
-            self.observer.join() 
+        self.cleanup() 

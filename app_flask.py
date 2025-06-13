@@ -13,6 +13,12 @@ from dotenv import load_dotenv
 from lib.prompt_manager import PromptManager
 from models.prompt import Prompt
 from functools import wraps
+import psutil
+import gc
+import logging
+from datetime import datetime
+import atexit
+import signal
 
 # Load environment variables
 load_dotenv()
@@ -65,6 +71,7 @@ Talisman(app, content_security_policy=talisman_csp)
 
 # Initialize tasks manager
 tasks_manager = TasksManager()
+app.tasks_manager = tasks_manager  # Store reference in app for cleanup
 
 # Initialize AI processor
 PROJECT_ROOT = Path(__file__).parent
@@ -83,6 +90,23 @@ app.json.ensure_ascii = False
 # DF7833 - accent
 # 30A8A5 - secondary
 # FDC399 - highlight
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+def log_memory_usage():
+    """Log current memory usage"""
+    process = psutil.Process()
+    memory_info = process.memory_info()
+    logger.info(f"Memory Usage - RSS: {memory_info.rss / 1024 / 1024:.2f}MB, "
+                f"Percent: {process.memory_percent():.2f}%, "
+                f"Time: {datetime.now().isoformat()}")
+
+@app.before_request
+def before_request():
+    """Log memory usage before each request"""
+    log_memory_usage()
 
 @app.route('/')
 @require_auth
@@ -382,6 +406,42 @@ def manifest():
 @app.route('/offline.html')
 def offline():
     return app.send_static_file('offline.html')
+
+@app.route('/api/debug/memory')
+@require_auth
+def memory_debug():
+    """Debug endpoint to check memory usage"""
+    process = psutil.Process()
+    memory_info = process.memory_info()
+    
+    # Force garbage collection
+    gc.collect()
+    
+    return jsonify({
+        'rss': memory_info.rss / 1024 / 1024,  # RSS in MB
+        'vms': memory_info.vms / 1024 / 1024,  # VMS in MB
+        'percent': process.memory_percent(),    # Memory usage as a percentage
+        'gc_collected': gc.get_count()         # Garbage collection counts
+    })
+
+def cleanup_resources():
+    """Cleanup all resources when the application exits"""
+    if hasattr(app, 'tasks_manager'):
+        app.tasks_manager.cleanup()
+    # Force garbage collection
+    gc.collect()
+
+# Register cleanup handlers
+atexit.register(cleanup_resources)
+signal.signal(signal.SIGTERM, lambda s, f: cleanup_resources())
+
+@app.teardown_appcontext
+def cleanup_context(exception=None):
+    """Cleanup resources when the application context is torn down"""
+    if hasattr(app, 'tasks_manager'):
+        app.tasks_manager.cleanup()
+    # Force garbage collection after each request
+    gc.collect()
 
 if __name__ == '__main__':
     port = int(os.getenv('WEBAPP_PORT', 3002))
