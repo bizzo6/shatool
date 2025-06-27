@@ -19,6 +19,7 @@ import logging
 from datetime import datetime
 import atexit
 import signal
+from ai_processor.config import Config
 
 # Load environment variables
 load_dotenv()
@@ -79,7 +80,7 @@ DATA_DIR = PROJECT_ROOT / "data"
 ai_processor = MessageProcessor(DataStore(storage_dir=str(DATA_DIR)))
 
 # Initialize prompt manager
-prompt_manager = PromptManager(Path(__file__).parent / "prompts")
+prompt_manager = PromptManager(Config.PROMPTS_DIR)
 
 # Configure Flask to handle Hebrew text properly
 app.json.ensure_ascii = False
@@ -141,6 +142,11 @@ def prompts():
 @require_auth
 def todo():
     return render_template('todo.html', active_page='todo')
+
+@app.route('/calendar')
+@require_auth
+def calendar():
+    return render_template('calendar.html', active_page='calendar')
 
 @app.route('/debug')
 @require_auth
@@ -232,9 +238,9 @@ def process_messages(template):
         return jsonify({'error': 'No messages provided'}), 400
     
     # Validate template type
-    valid_templates = ['todo', 'calendar', 'general']
-    if template not in valid_templates:
-        return jsonify({'error': f'Invalid template. Must be one of: {", ".join(valid_templates)}'}), 400
+    available_prompts = Config.list_available_prompts()
+    if template not in available_prompts:
+        return jsonify({'error': f'Invalid template. Must be one of: {", ".join(available_prompts.keys())}'}), 400
     
     try:
         # Process messages, replacing "now" with current timestamp and mapping time to timestamp

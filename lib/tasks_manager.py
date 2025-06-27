@@ -17,15 +17,15 @@ class TasksManager:
     def __init__(self, data_dir: str = None):
         # Use STORAGE_DIR from environment if available, otherwise use default
         self.data_dir = Path(data_dir or os.getenv('STORAGE_DIR', 'data'))
-        # Create the data directory and its subdirectories if they don't exist
+        self.tasks_dir = self.data_dir / "tasks"
+        # Create the data directory and tasks subdirectory if they don't exist
         self.data_dir.mkdir(parents=True, exist_ok=True)
-        for subdir in ['todo', 'general', 'calendar']:
-            (self.data_dir / subdir).mkdir(parents=True, exist_ok=True)
+        self.tasks_dir.mkdir(parents=True, exist_ok=True)
             
+        # Initialize with supported task types
+        self.supported_types = ["todo", "general", "calendar"]
         self.tasks: Dict[str, List[dict]] = {
-            "todo": [],
-            "general": [],
-            "calendar": []
+            task_type: [] for task_type in self.supported_types
         }
         self.last_update = 0
         self.observer = None
@@ -53,51 +53,49 @@ class TasksManager:
         self.observer = Observer()
         self.observer.schedule(
             TasksEventHandler(self),
-            str(self.data_dir),
-            recursive=True
+            str(self.tasks_dir),
+            recursive=False  # Only watch the tasks directory, not subdirectories
         )
         self.observer.start()
 
     def _load_tasks_from_folder(self, task_type: str, limit: int = 100, offset: int = 0) -> List[dict]:
-        """Load tasks from a specific type folder with pagination"""
+        """Load tasks of a specific type from the tasks folder with pagination"""
         tasks = []
-        type_dir = self.data_dir / task_type
         
-        if not type_dir.exists():
+        if not self.tasks_dir.exists():
             return tasks
 
         # Get all JSON files and sort by modification time (newest first)
-        files = sorted(type_dir.glob("*.json"), key=lambda x: x.stat().st_mtime, reverse=True)
+        files = sorted(self.tasks_dir.glob("*.json"), key=lambda x: x.stat().st_mtime, reverse=True)
+        
+        for file_path in files:
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    task = json.load(f)
+                    # Only include tasks of the specified type
+                    if task.get('type') == task_type:
+                        tasks.append(task)
+            except Exception as e:
+                print(f"Error loading task from {file_path}: {e}")
         
         # Apply pagination
         start = offset
         end = offset + limit
-        paginated_files = files[start:end]
+        return tasks[start:end]
 
-        for file_path in paginated_files:
+    def _find_task_file(self, task_id: str) -> Optional[Path]:
+        """Find the file path for a given task ID in the tasks folder"""
+        if not self.tasks_dir.exists():
+            return None
+            
+        for file_path in self.tasks_dir.glob("*.json"):
             try:
                 with open(file_path, 'r', encoding='utf-8') as f:
                     task = json.load(f)
-                    tasks.append(task)
+                    if task.get('id') == task_id:
+                        return file_path
             except Exception as e:
-                print(f"Error loading task from {file_path}: {e}")
-        
-        return tasks
-
-    def _find_task_file(self, task_id: str) -> Optional[Path]:
-        """Find the file path for a given task ID"""
-        for task_type in self.tasks.keys():
-            type_dir = self.data_dir / task_type
-            if not type_dir.exists():
-                continue
-            for file_path in type_dir.glob("*.json"):
-                try:
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        task = json.load(f)
-                        if task.get('id') == task_id:
-                            return file_path
-                except Exception as e:
-                    print(f"Error reading task file {file_path}: {e}")
+                print(f"Error reading task file {file_path}: {e}")
         return None
 
     def update_task(self, task_id: str, updates: dict) -> bool:
@@ -115,6 +113,9 @@ class TasksManager:
             for key, value in updates.items():
                 if key != 'id':  # Don't allow updating the ID
                     task[key] = value
+
+            # Add updated timestamp
+            task['updated_at'] = time.time()
 
             # Write updated task back to file
             with open(file_path, 'w', encoding='utf-8') as f:
@@ -145,19 +146,52 @@ class TasksManager:
 
     def refresh(self):
         """Refresh all tasks from the data directory"""
-        for task_type in self.tasks.keys():
+        for task_type in self.supported_types:
             self.tasks[task_type] = self._load_tasks_from_folder(task_type)
         self.last_update = time.time()
 
     def get_tasks(self, task_type: Optional[str] = None, limit: int = 100, offset: int = 0) -> Dict[str, List[dict]]:
         """Get tasks with pagination"""
         if task_type:
+            if task_type not in self.supported_types:
+                return {task_type: []}
             return {task_type: self._load_tasks_from_folder(task_type, limit, offset)}
         
         result = {}
-        for t_type in self.tasks.keys():
+        for t_type in self.supported_types:
             result[t_type] = self._load_tasks_from_folder(t_type, limit, offset)
         return result
+
+    def get_all_tasks(self, limit: int = 100, offset: int = 0) -> List[dict]:
+        """Get all tasks regardless of type with pagination"""
+        all_tasks = []
+        
+        if not self.tasks_dir.exists():
+            return all_tasks
+
+        # Get all JSON files and sort by modification time (newest first)
+        files = sorted(self.tasks_dir.glob("*.json"), key=lambda x: x.stat().st_mtime, reverse=True)
+        
+        # Apply pagination
+        start = offset
+        end = offset + limit
+        paginated_files = files[start:end]
+
+        for file_path in paginated_files:
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    task = json.load(f)
+                    all_tasks.append(task)
+            except Exception as e:
+                print(f"Error loading task from {file_path}: {e}")
+        
+        return all_tasks
+
+    def get_tasks_by_type(self, task_type: str, limit: int = 100, offset: int = 0) -> List[dict]:
+        """Get tasks of a specific type with pagination"""
+        if task_type not in self.supported_types:
+            return []
+        return self._load_tasks_from_folder(task_type, limit, offset)
 
     def get_last_update(self) -> float:
         """Get timestamp of last update"""

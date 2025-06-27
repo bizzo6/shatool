@@ -138,6 +138,14 @@ function createTaskCard(task) {
     card.querySelector('.task-due-date').textContent = formatDate(task.due_date);
     card.querySelector('.task-priority').textContent = `עדיפות: ${priorityLabels[task.priority] || task.priority}`;
     
+    // Add type label
+    const typeLabel = document.createElement('span');
+    typeLabel.className = 'text-xs rounded px-2 py-1 ml-2';
+    typeLabel.style.background = '#FDC399';
+    typeLabel.style.color = '#104F6A';
+    typeLabel.textContent = task.type || 'todo';
+    card.querySelector('.task-title').parentNode.insertBefore(typeLabel, card.querySelector('.task-title').nextSibling);
+    
     // Set status icon
     const statusIcon = card.querySelector('.status-icon');
     statusIcon.innerHTML = statusIcons[task.status] || statusIcons['pending'];
@@ -172,9 +180,10 @@ function displayTasks(tasks) {
 
 async function loadTasks() {
     try {
-        const response = await fetch('/api/tasks?type=todo');
+        const response = await fetch('/api/tasks');
         const data = await response.json();
-        currentTasks = data.tasks.todo || [];
+        // Flatten all tasks from all types into a single array
+        currentTasks = Object.values(data.tasks).flat();
         displayTasks(currentTasks);
     } catch (error) {
         console.error('Error loading tasks:', error);

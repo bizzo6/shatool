@@ -27,7 +27,7 @@ class Config:
     RETRY_DELAY = int(os.getenv("RETRY_DELAY", "5"))
     
     # File paths
-    PROMPTS_DIR = PROJECT_ROOT / "prompts"
+    PROMPTS_DIR = PROJECT_ROOT / "data" / "prompts"
     METADATA_FILE = PROJECT_ROOT / "config" / "metadata.json"
     
     # Initialize prompt manager

@@ -132,18 +132,13 @@ class MessageProcessor:
                 print(json.dumps(result, indent=2, ensure_ascii=False))
                 
                 # Validate that the result has the expected structure
-                if prompt_type == "todo":
-                    if not isinstance(result, dict):
-                        raise ValueError(f"Expected JSON object, got {type(result)}")
-                    if "todos" not in result:
-                        print("\nResponse is missing 'todos' field. Available fields:", list(result.keys()))
-                        raise ValueError("Response missing 'todos' field")
-                    if not isinstance(result["todos"], list):
-                        raise ValueError(f"Expected 'todos' to be a list, got {type(result['todos'])}")
-                elif prompt_type == "calendar" and "events" not in result:
-                    raise ValueError("Response missing 'events' field")
-                elif prompt_type == "general" and "items" not in result:
-                    raise ValueError("Response missing 'items' field")
+                if not isinstance(result, dict):
+                    raise ValueError(f"Expected JSON object, got {type(result)}")
+                if "todos" not in result:
+                    print("\nResponse is missing 'todos' field. Available fields:", list(result.keys()))
+                    raise ValueError("Response missing 'todos' field")
+                if not isinstance(result["todos"], list):
+                    raise ValueError(f"Expected 'todos' to be a list, got {type(result['todos'])}")
                 
             except json.JSONDecodeError as e:
                 print(f"\nError parsing JSON response: {str(e)}")
@@ -154,7 +149,7 @@ class MessageProcessor:
                 raise ValueError(f"Invalid JSON response from GPT: {str(e)}")
             
             # Save the processed data
-            saved_ids = await self.data_store.save(result)
+            saved_ids = await self.data_store.save(result, prompt_type)
             
             # Add metadata to the result
             result['metadata'] = {
