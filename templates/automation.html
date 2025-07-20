@@ -1,0 +1,492 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="max-w-6xl mx-auto flex flex-col gap-6 text-right">
+    <!-- Header -->
+    <div class="bg-white rounded-xl shadow-md p-6">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-2xl font-bold text-[#104F6A]">ניהול אוטומציה</h2>
+            <div class="flex gap-2">
+                <button onclick="refreshData()" class="bg-[#30A8A5] text-white px-4 py-2 rounded-lg hover:bg-[#2a9794] transition-colors">
+                    רענן
+                </button>
+                <button onclick="showCreateModal()" class="bg-[#DF7833] text-white px-4 py-2 rounded-lg hover:bg-[#c66a2e] transition-colors">
+                    צור אוטומציה חדשה
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Automation List -->
+    <div class="bg-white rounded-xl shadow-md p-6">
+        <h3 class="text-lg font-semibold text-[#104F6A] mb-4">אוטומציות פעילות</h3>
+        <div id="automationList" class="space-y-4">
+            <!-- Automations will be loaded here -->
+        </div>
+    </div>
+
+    <!-- Status Panel -->
+    <div class="bg-white rounded-xl shadow-md p-6">
+        <h3 class="text-lg font-semibold text-[#104F6A] mb-4">סטטוס אוטומציות</h3>
+        <div id="statusPanel" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <!-- Status cards will be loaded here -->
+        </div>
+    </div>
+</div>
+
+<!-- Create/Edit Automation Modal -->
+<div id="automationModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-white rounded-xl shadow-md p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-start mb-4">
+            <h3 id="modalTitle" class="text-xl font-bold text-[#104F6A]">צור אוטומציה חדשה</h3>
+            <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+        
+        <form id="automationForm" class="space-y-4">
+            <input type="hidden" id="automationId" name="automation_id">
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">בעלים</label>
+                    <input type="text" id="owner" name="owner" required class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#30A8A5]">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">מזהה לקוח</label>
+                    <input type="text" id="customerId" name="customer_id" required class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#30A8A5]">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">קבוצת סוכן</label>
+                    <input type="text" id="agentGroup" name="agent_group" required class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#30A8A5]">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">דקות בין בדיקות</label>
+                    <input type="number" id="getMsgMinutes" name="get_msg_minutes" min="1" max="60" value="5" class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#30A8A5]">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">מינימום הודעות</label>
+                    <input type="number" id="minMsgCount" name="min_msg_count" min="1" value="1" class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#30A8A5]">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">זמן מקסימום (דקות)</label>
+                    <input type="number" id="processMaxTime" name="process_max_time" min="1" value="30" class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#30A8A5]">
+                </div>
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">סוגי פרומפטים</label>
+                <div class="space-y-2">
+                    <label class="flex items-center">
+                        <input type="checkbox" name="prompts" value="todo" class="rounded border-gray-300 text-[#30A8A5] focus:ring-[#30A8A5]">
+                        <span class="mr-2">משימות (Todo)</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="checkbox" name="prompts" value="calendar" class="rounded border-gray-300 text-[#30A8A5] focus:ring-[#30A8A5]">
+                        <span class="mr-2">לוח שנה (Calendar)</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="checkbox" name="prompts" value="general" class="rounded border-gray-300 text-[#30A8A5] focus:ring-[#30A8A5]">
+                        <span class="mr-2">כללי (General)</span>
+                    </label>
+                </div>
+            </div>
+            
+            <div class="flex items-center space-x-4 space-x-reverse">
+                <label class="flex items-center">
+                    <input type="checkbox" id="active" name="active" checked class="rounded border-gray-300 text-[#30A8A5] focus:ring-[#30A8A5]">
+                    <span class="mr-2">פעיל</span>
+                </label>
+                
+                <label class="flex items-center">
+                    <input type="checkbox" id="agentPeekOnly" name="agent_peek_only" class="rounded border-gray-300 text-[#30A8A5] focus:ring-[#30A8A5]">
+                    <span class="mr-2">בדיקה בלבד (לא מוחק הודעות)</span>
+                </label>
+            </div>
+            
+            <div class="flex justify-end gap-3 pt-4">
+                <button type="button" onclick="closeModal()" class="bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400 transition-colors">
+                    ביטול
+                </button>
+                <button type="submit" class="bg-[#30A8A5] text-white px-4 py-2 rounded-lg hover:bg-[#2a9794] transition-colors">
+                    שמור
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Logs Modal -->
+<div id="logsModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-white rounded-xl shadow-md p-6 max-w-4xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+        <div class="flex justify-between items-start mb-4">
+            <h3 id="logsTitle" class="text-xl font-bold text-[#104F6A]">יומן פעילות</h3>
+            <button onclick="closeLogsModal()" class="text-gray-400 hover:text-gray-600">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+        
+        <div id="logsContent" class="space-y-2">
+            <!-- Logs will be loaded here -->
+        </div>
+    </div>
+</div>
+
+<script>
+let automations = {};
+let statuses = {};
+
+async function loadAutomations() {
+    try {
+        const response = await fetch('/api/automation');
+        const data = await response.json();
+        automations = data.automations || {};
+        renderAutomations();
+    } catch (error) {
+        console.error('Error loading automations:', error);
+    }
+}
+
+async function loadStatus() {
+    try {
+        const response = await fetch('/api/automation/status');
+        const data = await response.json();
+        statuses = data.statuses || {};
+        renderStatus();
+    } catch (error) {
+        console.error('Error loading status:', error);
+    }
+}
+
+function renderAutomations() {
+    const container = document.getElementById('automationList');
+    container.innerHTML = '';
+    
+    if (Object.keys(automations).length === 0) {
+        container.innerHTML = '<p class="text-gray-500 text-center py-8">אין אוטומציות מוגדרות</p>';
+        return;
+    }
+    
+    Object.entries(automations).forEach(([id, automation]) => {
+        const status = statuses[id] || {};
+        const card = document.createElement('div');
+        card.className = 'border rounded-lg p-4 hover:shadow-md transition-shadow';
+        
+        card.innerHTML = `
+            <div class="flex justify-between items-start mb-3">
+                <div>
+                    <h4 class="font-semibold text-[#104F6A]">${automation.owner} - ${automation.customer_id}</h4>
+                    <p class="text-sm text-gray-600">קבוצה: ${automation.agent_group}</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="px-2 py-1 text-xs rounded ${automation.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                        ${automation.active ? 'פעיל' : 'לא פעיל'}
+                    </span>
+                    <span class="px-2 py-1 text-xs rounded ${status.is_running ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}">
+                        ${status.is_running ? 'רץ' : 'עוצר'}
+                    </span>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-3">
+                <div>
+                    <span class="text-gray-600">פרומפטים:</span>
+                    <span class="font-medium">${automation.prompts.join(', ')}</span>
+                </div>
+                <div>
+                    <span class="text-gray-600">בדיקה כל:</span>
+                    <span class="font-medium">${automation.get_msg_minutes} דקות</span>
+                </div>
+                <div>
+                    <span class="text-gray-600">מינימום הודעות:</span>
+                    <span class="font-medium">${automation.min_msg_count}</span>
+                </div>
+                <div>
+                    <span class="text-gray-600">זמן מקסימום:</span>
+                    <span class="font-medium">${automation.process_max_time} דקות</span>
+                </div>
+            </div>
+            
+            <div class="flex justify-between items-center">
+                <div class="flex gap-2">
+                    <button onclick="editAutomation('${id}')" class="bg-[#30A8A5] text-white px-3 py-1 rounded text-sm hover:bg-[#2a9794] transition-colors">
+                        ערוך
+                    </button>
+                    <button onclick="showLogs('${id}')" class="bg-[#DF7833] text-white px-3 py-1 rounded text-sm hover:bg-[#c66a2e] transition-colors">
+                        יומן
+                    </button>
+                    <button onclick="deleteAutomation('${id}')" class="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 transition-colors">
+                        מחק
+                    </button>
+                </div>
+                
+                <div class="flex gap-2">
+                    ${status.is_running ? 
+                        `<button onclick="stopAutomation('${id}')" class="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 transition-colors">עצור</button>` :
+                        `<button onclick="startAutomation('${id}')" class="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600 transition-colors">התחל</button>`
+                    }
+                </div>
+            </div>
+        `;
+        
+        container.appendChild(card);
+    });
+}
+
+function renderStatus() {
+    const container = document.getElementById('statusPanel');
+    container.innerHTML = '';
+    
+    Object.entries(statuses).forEach(([id, status]) => {
+        const automation = automations[id];
+        if (!automation) return;
+        
+        const card = document.createElement('div');
+        card.className = 'border rounded-lg p-4 bg-gray-50';
+        
+        card.innerHTML = `
+            <h4 class="font-semibold text-[#104F6A] mb-2">${automation.owner} - ${automation.customer_id}</h4>
+            <div class="space-y-2 text-sm">
+                <div class="flex justify-between">
+                    <span class="text-gray-600">סטטוס:</span>
+                    <span class="font-medium ${status.is_running ? 'text-green-600' : 'text-red-600'}">
+                        ${status.is_running ? 'רץ' : 'עוצר'}
+                    </span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-600">הודעות נבדקו:</span>
+                    <span class="font-medium">${status.messages_checked}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-600">הודעות עובדו:</span>
+                    <span class="font-medium">${status.messages_processed}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-600">שגיאות:</span>
+                    <span class="font-medium ${status.errors_count > 0 ? 'text-red-600' : 'text-green-600'}">${status.errors_count}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-600">בדיקה אחרונה:</span>
+                    <span class="font-medium">${status.last_check ? new Date(status.last_check).toLocaleString('he-IL') : 'לא נבדק'}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-600">עיבוד אחרון:</span>
+                    <span class="font-medium">${status.last_process ? new Date(status.last_process).toLocaleString('he-IL') : 'לא עובד'}</span>
+                </div>
+            </div>
+        `;
+        
+        container.appendChild(card);
+    });
+}
+
+function showCreateModal() {
+    document.getElementById('modalTitle').textContent = 'צור אוטומציה חדשה';
+    document.getElementById('automationForm').reset();
+    document.getElementById('automationId').value = '';
+    document.getElementById('automationModal').classList.remove('hidden');
+    document.getElementById('automationModal').classList.add('flex');
+}
+
+function editAutomation(id) {
+    const automation = automations[id];
+    if (!automation) return;
+    
+    document.getElementById('modalTitle').textContent = 'ערוך אוטומציה';
+    document.getElementById('automationId').value = id;
+    document.getElementById('owner').value = automation.owner;
+    document.getElementById('customerId').value = automation.customer_id;
+    document.getElementById('agentGroup').value = automation.agent_group;
+    document.getElementById('getMsgMinutes').value = automation.get_msg_minutes;
+    document.getElementById('minMsgCount').value = automation.min_msg_count;
+    document.getElementById('processMaxTime').value = automation.process_max_time;
+    document.getElementById('active').checked = automation.active;
+    document.getElementById('agentPeekOnly').checked = automation.agent_peek_only;
+    
+    // Clear and set prompts
+    document.querySelectorAll('input[name="prompts"]').forEach(checkbox => {
+        checkbox.checked = automation.prompts.includes(checkbox.value);
+    });
+    
+    document.getElementById('automationModal').classList.remove('hidden');
+    document.getElementById('automationModal').classList.add('flex');
+}
+
+function closeModal() {
+    document.getElementById('automationModal').classList.add('hidden');
+    document.getElementById('automationModal').classList.remove('flex');
+}
+
+async function saveAutomation(event) {
+    event.preventDefault();
+    
+    const formData = new FormData(event.target);
+    const automationId = formData.get('automation_id');
+    
+    const prompts = Array.from(document.querySelectorAll('input[name="prompts"]:checked')).map(cb => cb.value);
+    
+    const data = {
+        owner: formData.get('owner'),
+        customer_id: formData.get('customer_id'),
+        agent_group: formData.get('agent_group'),
+        prompts: prompts,
+        get_msg_minutes: parseInt(formData.get('get_msg_minutes')),
+        min_msg_count: parseInt(formData.get('min_msg_count')),
+        process_max_time: parseInt(formData.get('process_max_time')),
+        active: document.getElementById('active').checked,
+        agent_peek_only: document.getElementById('agentPeekOnly').checked
+    };
+    
+    try {
+        const url = automationId ? `/api/automation/${automationId}` : '/api/automation';
+        const method = automationId ? 'PUT' : 'POST';
+        
+        const response = await fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        });
+        
+        if (response.ok) {
+            closeModal();
+            refreshData();
+        } else {
+            const error = await response.json();
+            alert(`שגיאה: ${error.error}`);
+        }
+    } catch (error) {
+        console.error('Error saving automation:', error);
+        alert('שגיאה בשמירת האוטומציה');
+    }
+}
+
+async function deleteAutomation(id) {
+    if (!confirm('האם אתה בטוח שברצונך למחוק אוטומציה זו?')) return;
+    
+    try {
+        const response = await fetch(`/api/automation/${id}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            refreshData();
+        } else {
+            const error = await response.json();
+            alert(`שגיאה: ${error.error}`);
+        }
+    } catch (error) {
+        console.error('Error deleting automation:', error);
+        alert('שגיאה במחיקת האוטומציה');
+    }
+}
+
+async function startAutomation(id) {
+    try {
+        const response = await fetch(`/api/automation/${id}/start`, {
+            method: 'POST'
+        });
+        
+        if (response.ok) {
+            refreshData();
+        } else {
+            const error = await response.json();
+            alert(`שגיאה: ${error.error}`);
+        }
+    } catch (error) {
+        console.error('Error starting automation:', error);
+        alert('שגיאה בהתחלת האוטומציה');
+    }
+}
+
+async function stopAutomation(id) {
+    try {
+        const response = await fetch(`/api/automation/${id}/stop`, {
+            method: 'POST'
+        });
+        
+        if (response.ok) {
+            refreshData();
+        } else {
+            const error = await response.json();
+            alert(`שגיאה: ${error.error}`);
+        }
+    } catch (error) {
+        console.error('Error stopping automation:', error);
+        alert('שגיאה בעצירת האוטומציה');
+    }
+}
+
+function showLogs(id) {
+    const status = statuses[id];
+    const automation = automations[id];
+    
+    if (!status || !automation) return;
+    
+    document.getElementById('logsTitle').textContent = `יומן פעילות - ${automation.owner} - ${automation.customer_id}`;
+    
+    const logsContent = document.getElementById('logsContent');
+    logsContent.innerHTML = '';
+    
+    if (status.logs.length === 0) {
+        logsContent.innerHTML = '<p class="text-gray-500 text-center py-4">אין רשומות יומן</p>';
+    } else {
+        status.logs.reverse().forEach(log => {
+            const logEntry = document.createElement('div');
+            logEntry.className = 'border-b pb-2';
+            logEntry.innerHTML = `
+                <div class="flex justify-between items-start">
+                    <div>
+                        <span class="font-medium">${log.action}</span>
+                        <span class="text-gray-600">${log.message}</span>
+                    </div>
+                    <span class="text-xs text-gray-500">${new Date(log.timestamp).toLocaleString('he-IL')}</span>
+                </div>
+                ${log.details ? `<div class="text-xs text-gray-500 mt-1">${JSON.stringify(log.details)}</div>` : ''}
+            `;
+            logsContent.appendChild(logEntry);
+        });
+    }
+    
+    document.getElementById('logsModal').classList.remove('hidden');
+    document.getElementById('logsModal').classList.add('flex');
+}
+
+function closeLogsModal() {
+    document.getElementById('logsModal').classList.add('hidden');
+    document.getElementById('logsModal').classList.remove('flex');
+}
+
+async function refreshData() {
+    await Promise.all([loadAutomations(), loadStatus()]);
+}
+
+// Event listeners
+document.getElementById('automationForm').addEventListener('submit', saveAutomation);
+
+// Close modals when clicking outside
+document.getElementById('automationModal').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) {
+        closeModal();
+    }
+});
+
+document.getElementById('logsModal').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) {
+        closeLogsModal();
+    }
+});
+
+// Initial load
+refreshData();
+</script>
+{% endblock %} 
