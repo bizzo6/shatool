@@ -20,6 +20,7 @@ from datetime import datetime
 import atexit
 import signal
 from ai_processor.config import Config
+from lib.automation_manager import AutomationManager
 
 # Load environment variables
 load_dotenv()
@@ -81,6 +82,9 @@ ai_processor = MessageProcessor(DataStore(storage_dir=str(DATA_DIR)))
 
 # Initialize prompt manager
 prompt_manager = PromptManager(Config.PROMPTS_DIR)
+
+# Initialize automation manager
+automation_manager = AutomationManager(PROJECT_ROOT / "data" / "automation", AGENT_HOST)
 
 # Configure Flask to handle Hebrew text properly
 app.json.ensure_ascii = False
@@ -147,6 +151,11 @@ def todo():
 @require_auth
 def calendar():
     return render_template('calendar.html', active_page='calendar')
+
+@app.route('/automation')
+@require_auth
+def automation():
+    return render_template('automation.html', active_page='automation')
 
 @app.route('/debug')
 @require_auth
@@ -416,19 +425,260 @@ def offline():
 @app.route('/api/debug/memory')
 @require_auth
 def memory_debug():
-    """Debug endpoint to check memory usage"""
-    process = psutil.Process()
-    memory_info = process.memory_info()
-    
-    # Force garbage collection
-    gc.collect()
-    
-    return jsonify({
-        'rss': memory_info.rss / 1024 / 1024,  # RSS in MB
-        'vms': memory_info.vms / 1024 / 1024,  # VMS in MB
-        'percent': process.memory_percent(),    # Memory usage as a percentage
-        'gc_collected': gc.get_count()         # Garbage collection counts
-    })
+    """API endpoint to get memory usage information"""
+    try:
+        process = psutil.Process()
+        memory_info = process.memory_info()
+        return jsonify({
+            'rss_mb': memory_info.rss / 1024 / 1024,
+            'percent': process.memory_percent(),
+            'timestamp': datetime.now().isoformat()
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# Automation Management API Endpoints
+@app.route('/api/automation')
+@require_auth
+def list_automations():
+    """API endpoint to list all automation configurations"""
+    try:
+        configs = automation_manager.load_configurations()
+        return jsonify({
+            'automations': {
+                automation_id: {
+                    'automation_id': config.automation_id,
+                    'owner': config.owner,
+                    'customer_id': config.customer_id,
+                    'active': config.active,
+                    'agent_group': config.agent_group,
+                    'agent_peek_only': config.agent_peek_only,
+                    'prompts': config.prompts,
+                    'get_msg_minutes': config.get_msg_minutes,
+                    'min_msg_count': config.min_msg_count,
+                    'process_max_time': config.process_max_time
+                }
+                for automation_id, config in configs.items()
+            }
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/automation/<automation_id>', methods=['GET'])
+@require_auth
+def get_automation(automation_id):
+    """API endpoint to get a specific automation configuration"""
+    try:
+        configs = automation_manager.load_configurations()
+        if automation_id not in configs:
+            return jsonify({'error': 'Automation not found'}), 404
+            
+        config = configs[automation_id]
+        return jsonify({
+            'automation_id': config.automation_id,
+            'owner': config.owner,
+            'customer_id': config.customer_id,
+            'active': config.active,
+            'agent_group': config.agent_group,
+            'agent_peek_only': config.agent_peek_only,
+            'prompts': config.prompts,
+            'get_msg_minutes': config.get_msg_minutes,
+            'min_msg_count': config.min_msg_count,
+            'process_max_time': config.process_max_time
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/automation', methods=['POST'])
+@require_auth
+def create_automation():
+    """API endpoint to create a new automation configuration"""
+    if not request.is_json:
+        return jsonify({'error': 'Request must be JSON'}), 400
+        
+    try:
+        data = request.get_json()
+        required_fields = ['owner', 'customer_id', 'agent_group', 'prompts']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({'error': f'Missing required field: {field}'}), 400
+        
+        config = automation_manager.create_configuration(
+            owner=data['owner'],
+            customer_id=data['customer_id'],
+            agent_group=data['agent_group'],
+            prompts=data['prompts'],
+            active=data.get('active', True),
+            agent_peek_only=data.get('agent_peek_only', False),
+            get_msg_minutes=data.get('get_msg_minutes', 5),
+            min_msg_count=data.get('min_msg_count', 1),
+            process_max_time=data.get('process_max_time', 30)
+        )
+        
+        return jsonify({
+            'success': True,
+            'automation_id': config.automation_id,
+            'message': 'Automation created successfully'
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/automation/<automation_id>', methods=['PUT'])
+@require_auth
+def update_automation(automation_id):
+    """API endpoint to update an automation configuration"""
+    if not request.is_json:
+        return jsonify({'error': 'Request must be JSON'}), 400
+        
+    try:
+        data = request.get_json()
+        configs = automation_manager.load_configurations()
+        
+        if automation_id not in configs:
+            return jsonify({'error': 'Automation not found'}), 404
+            
+        # Update the configuration
+        config = configs[automation_id]
+        for field, value in data.items():
+            if hasattr(config, field):
+                setattr(config, field, value)
+        
+        if automation_manager.save_configuration(config):
+            # Refresh the in-memory configurations to ensure the running automation uses the updated config
+            automation_manager.refresh_configurations()
+            return jsonify({
+                'success': True,
+                'message': 'Automation updated successfully'
+            })
+        else:
+            return jsonify({'error': 'Failed to save automation'}), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/automation/<automation_id>', methods=['DELETE'])
+@require_auth
+def delete_automation(automation_id):
+    """API endpoint to delete an automation configuration"""
+    try:
+        if automation_manager.delete_configuration(automation_id):
+            return jsonify({
+                'success': True,
+                'message': 'Automation deleted successfully'
+            })
+        else:
+            return jsonify({'error': 'Automation not found'}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/automation/status')
+@require_auth
+def get_automation_status():
+    """API endpoint to get status of all automation jobs"""
+    try:
+        statuses = automation_manager.get_status()
+        return jsonify({
+            'statuses': {
+                automation_id: {
+                    'automation_id': status.automation_id,
+                    'active': status.active,
+                    'last_check': status.last_check,
+                    'last_process': status.last_process,
+                    'messages_checked': status.messages_checked,
+                    'messages_processed': status.messages_processed,
+                    'errors_count': status.errors_count,
+                    'is_running': status.is_running,
+                    'next_trigger': automation_manager._calculate_next_trigger(
+                        automation_manager.automation_configs[automation_id], 
+                        status.last_check
+                    ),
+                    'logs': [
+                        {
+                            'timestamp': log.timestamp,
+                            'action': log.action,
+                            'message': log.message,
+                            'details': log.details
+                        }
+                        for log in status.logs
+                    ]
+                }
+                for automation_id, status in statuses.items()
+            }
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/automation/<automation_id>/status')
+@require_auth
+def get_automation_detailed_status(automation_id):
+    """API endpoint to get detailed status for a specific automation job"""
+    try:
+        detailed_status = automation_manager.get_detailed_status(automation_id)
+        if detailed_status:
+            return jsonify(detailed_status)
+        else:
+            return jsonify({'error': 'Automation not found'}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/automation/<automation_id>/start', methods=['POST'])
+@require_auth
+def start_automation(automation_id):
+    """API endpoint to start a specific automation job"""
+    try:
+        if automation_manager.start_automation(automation_id):
+            return jsonify({
+                'success': True,
+                'message': 'Automation started successfully'
+            })
+        else:
+            return jsonify({'error': 'Failed to start automation'}), 400
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/automation/<automation_id>/stop', methods=['POST'])
+@require_auth
+def stop_automation(automation_id):
+    """API endpoint to stop a specific automation job"""
+    try:
+        if automation_manager.stop_automation(automation_id):
+            return jsonify({
+                'success': True,
+                'message': 'Automation stopped successfully'
+            })
+        else:
+            return jsonify({'error': 'Failed to stop automation'}), 400
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/automation/start-all', methods=['POST'])
+@require_auth
+def start_all_automations():
+    """API endpoint to start all automation jobs"""
+    try:
+        results = automation_manager.start_all_automations()
+        started_count = sum(1 for success in results.values() if success)
+        return jsonify({
+            'success': True,
+            'message': f'Started {started_count} out of {len(results)} automations',
+            'results': results
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/automation/stop-all', methods=['POST'])
+@require_auth
+def stop_all_automations():
+    """API endpoint to stop all automation jobs"""
+    try:
+        results = automation_manager.stop_all_automations()
+        stopped_count = sum(1 for success in results.values() if success)
+        return jsonify({
+            'success': True,
+            'message': f'Stopped {stopped_count} automations',
+            'results': results
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 def cleanup_resources():
     """Cleanup all resources when the application exits"""
